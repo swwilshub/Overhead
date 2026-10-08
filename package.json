@@ -1,0 +1,32 @@
+{
+  "name": "overhead",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A 90s-style factory management sim that runs in one HTML file.",
+  "type": "module",
+  "scripts": {
+    "gen": "node tools/gen_world.mjs",
+    "build": "node tools/gen_world.mjs && node tools/build.mjs --min",
+    "build:dev": "node tools/gen_world.mjs && node tools/build.mjs",
+    "test:node": "node test/run_node.mjs",
+    "test:ui": "node test/run_ui.mjs",
+    "test": "npm run test:node && npm run test:ui",
+    "scan": "node tools/ip_scan.mjs"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/swwilshub/Overhead.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "axe-core": "^4.14.0",
+    "d3-geo": "^3.1.1",
+    "esbuild": "^0.28.2",
+    "topojson-client": "^3.1.0",
+    "topojson-simplify": "^3.0.3",
+    "us-atlas": "^3.0.1"
+  }
+}

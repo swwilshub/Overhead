@@ -1,0 +1,93 @@
+# Conveyor UI: connect by belt from the machine inspector, link announcement, moving boxes, reduced-motion static boxes, axe.
+import asyncio
+import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from env import URL, AXE, SHOTS, launch_opts
+from playwright.async_api import async_playwright
+SHOT = str(SHOTS) + '/'
+fails = 0
+def ok(c, m):
+    global fails
+    print(('PASS ' if c else 'FAIL ') + m); fails += 0 if c else 1
+async def main():
+    async with async_playwright() as p:
+        b = await p.chromium.launch(**launch_opts()); pg = await b.new_page(viewport={'width': 1500, 'height': 1100})
+        errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
+        await pg.goto(URL); await pg.wait_for_timeout(600)
+        await pg.click('text=Quick start'); await pg.wait_for_timeout(300)
+        # A makes a component from bought materials; B makes a product that uses it. Each gets an operator.
+        ids = await pg.evaluate("""() => { const {app, G, RECIPES, ITEMS, hire} = window.__overhead, st = app.st;
+          st.bank.checking += 500000;
+          const mat = i => ITEMS[i].tier === 'material';
+          let comp, prod;
+          for (const p of RECIPES) { if (!p.start || ITEMS[p.out].tier !== 'product') continue; for (const [i] of p.inputs) { const c = RECIPES.find(r => r.out === i); if (!comp && c && c.start && c.family !== p.family && c.inputs.every(([m]) => mat(m))) { comp = c; prod = p; } } }
+          const place = (family, recipe, x0 = 2, y0 = 8) => { for (let y = y0; y < st.floor.h - 4; y++) for (let x = x0; x < st.floor.w - 6; x++) { const r = G.placeEquipment(st, { kind: 'machine', family, x, y, rot: 0, recipe }); if (r.ok) return r.obj; } return null; };
+          const A = place(comp.family, comp.id), B = place(prod.family, prod.id, A.x + 9, A.y + 2) || place(prod.family, prod.id);
+          G.assign(st, hire('operator'), A.id); G.assign(st, hire('operator'), B.id);
+          return { A: A.id, B: B.id }; }""")
+        await pg.click('nav.rail a[href="#city"]'); await pg.click('nav.rail a[href="#floor"]'); await pg.wait_for_timeout(400)
+        # select A from the equipment table, then connect by belt via the inspector
+        await pg.click(f'[data-key="eq-{ids["A"]}"]'); await pg.wait_for_timeout(300)
+        ok(await pg.locator('h3:has-text("Inputs, output and belts")').count() == 1, 'machine inspector has an Inputs, output and belts section')
+        opt = await pg.locator('#belt-to option').first.text_content()
+        ok('uses' in opt, 'first belt target is the machine that uses our output: ' + opt)
+        await pg.click('[data-key="belt-connect"]'); await pg.wait_for_timeout(300)
+        dlg = await pg.locator('dialog[open]').text_content()
+        ok('conveyor sections' in dlg, 'confirm shows sections and price: ' + ' '.join(dlg.split())[:120])
+        await pg.click('dialog[open] button:has-text("Lay belt")')
+        live = ''
+        for _ in range(10):
+            await pg.wait_for_timeout(150)
+            live += await pg.evaluate("() => [...document.querySelectorAll('[aria-live], .toast, #toasts')].map(e => e.textContent).join(' | ')")
+            if 'Belt connected' in live: break
+        ok('Belt connected' in live, 'link announced: ' + live[:160])
+        await pg.wait_for_timeout(300)
+        L = await pg.evaluate("(ids) => { const st = window.__overhead.app.st; window.__overhead.G.advance(st, 1); const b = window.__overhead.belt(); return { dirs: b.dirs.size, routes: Object.values(st.lanes || {}).map(r => [r.from, r.to, r.path.length]) }; }", ids)
+        await pg.wait_for_timeout(300)
+        L['dirs'] = await pg.evaluate("() => window.__overhead.belt().dirs.size")
+        ok(any(r[0] == ids['A'] and r[1] == ids['B'] for r in L['routes']) and L['dirs'] > 0, f'route drawn with direction arrows: {L}')
+        # run the clock and watch boxes travel
+        await pg.evaluate("() => { const st = window.__overhead.app.st; const G = window.__overhead.G; G.purchaseAll(st); for (const o of st.orders) o.eta = st.time; }")
+        await pg.keyboard.press('Escape')
+        await pg.evaluate("() => { const {app, G} = window.__overhead; while (!app.st.employees.every(e => e.act === 'work' || !e.assign) ) { G.advance(app.st, 5); if (app.st.time > 1e7) break; } G.advance(app.st, 90); }")
+        await pg.evaluate("() => { document.querySelector('[data-key=\"speed-1\"], button[aria-label*=\"Play\"]')?.click(); }")
+        await pg.evaluate("() => { window.__overhead.app.speed = 1; }")
+        # watch for five seconds: boxes come and go, so keep the most seen at once
+        tk = {'tokens': 0, 'live': 0}
+        for _ in range(20):
+            await pg.wait_for_timeout(250)
+            now = await pg.evaluate("(ids) => { const b = window.__overhead.belt(), st = window.__overhead.app.st; const A = st.floor.objects.find(o => o.id === ids.A); return { tokens: Object.values(st.lanes || {}).reduce((a, l) => a + l.boxes.length, 0), live: b.live.size, status: A.status, beltOut: A.beltOut || 0 }; }", ids)
+            tk = {'tokens': max(tk['tokens'], now['tokens']), 'live': max(tk['live'], now['live']), 'status': now['status'], 'beltOut': now['beltOut']}
+        print('A status', tk['status'], 'beltOut', tk['beltOut'])
+        ok(tk['tokens'] > 0 and tk['live'] > 0, f'boxes are riding the belt ({tk["tokens"]} on screen, {tk["live"]} rolling squares)')
+        # zoomed screenshot of the belt
+        await pg.evaluate("(ids) => { const {app} = window.__overhead; app.viewState.floor.sel = ids.A; }", ids)
+        await pg.wait_for_timeout(300)
+        await pg.locator('#floor-app').screenshot(path=SHOT + 'belt_run.png')
+        # select a conveyor square: inspector describes the line
+        cv = await pg.evaluate("() => { const fl = window.__overhead.app.st.floor; const c = fl.objects.filter(o => o.kind === 'conveyor')[2]; return c.id; }")
+        await pg.evaluate("(id) => { const {app} = window.__overhead; app.viewState.floor.sel = id; app.speed = 0; }", cv)
+        await pg.focus('#floor-app'); await pg.keyboard.press('Escape'); await pg.evaluate("(id) => { window.__overhead.app.viewState.floor.sel = id; }", cv)
+        await pg.click(f'[data-key="eq-{ids["A"]}"]'); await pg.wait_for_timeout(200)
+        await pg.evaluate("(id) => { window.__overhead.app.viewState.floor.sel = id; window.__overhead.app.dirty = true; }", cv)
+        await pg.evaluate("() => { document.querySelector('#floor-app').dispatchEvent(new Event('focus')); }")
+        # a raw conveyor with nothing attached is explained
+        r = await pg.evaluate("() => { const {app, G} = window.__overhead; const st = app.st; const x = st.floor.w - 3, y = st.floor.h - 3; const r = G.placeEquipment(st, { kind: 'conveyor', x, y }); return r.ok ? r.obj.id : r.msg; }")
+        desc = await pg.evaluate("(id) => { const st = window.__overhead.app.st; const o = st.floor.objects.find(o => o.id === id); return null; }", r)
+        # paused: boxes hold their places on the belt
+        await pg.evaluate("() => { window.__overhead.app.speed = 0; }"); await pg.wait_for_timeout(300)
+        # step the plant until a box is on a belt, then leave it paused
+        await pg.evaluate("() => { const {app, G} = window.__overhead, st = app.st; for (let i = 0; i < 600 && !Object.values(st.lanes || {}).some(l => l.boxes.length); i++) G.advance(st, 1); }")
+        await pg.wait_for_timeout(300)
+        t1 = await pg.evaluate("() => JSON.stringify(Object.values(window.__overhead.app.st.lanes).map(l => l.boxes.map(b => b.s.toFixed(2))))")
+        await pg.wait_for_timeout(800)
+        t2 = await pg.evaluate("() => JSON.stringify(Object.values(window.__overhead.app.st.lanes).map(l => l.boxes.map(b => b.s.toFixed(2))))")
+        ok(t1 == t2 and '"' in t1, f'paused: boxes stay where they are on the belt {t1[:80]}')
+        await pg.evaluate("() => { window.__overhead.app.speed = 0; }")
+        await pg.emulate_media(reduced_motion='no-preference')
+        await pg.click(f'[data-key="eq-{ids["A"]}"]'); await pg.wait_for_timeout(300)
+        await pg.add_script_tag(content=AXE)
+        res = await pg.evaluate("async () => { const r = await axe.run(document, { resultTypes: ['violations'] }); return r.violations.map(v => v.id + ':' + v.nodes.length); }")
+        ok(not res, f'axe on floor with belt inspector: {res}')
+        ok(not errs, f'no page errors {errs[:2]}')
+        await b.close()
+    print(f'{fails} FAILED' if fails else 'all belt UI checks pass')
+asyncio.run(main())

@@ -1,0 +1,41 @@
+Overhead
+Copyright (c) 2026 swwilshub and the Overhead contributors
+
+This project includes or builds with the following third-party work.
+
+Included in the built game (dist/overhead.html)
+-----------------------------------------------
+us-atlas 3.0.1 (https://github.com/topojson/us-atlas)
+  Copyright 2013-2019 Michael Bostock. ISC licence.
+  The US outline and state borders in src/gen/data.js are derived from
+  states-albers-10m.json. The underlying boundaries come from the US Census
+  Bureau's cartographic boundary files (public domain).
+
+US Census Bureau data (public domain, a work of the US federal government)
+  City and metro populations: Vintage 2024 population estimates, April 1, 2020
+  estimates base. City coordinates: 2020 Census Gazetteer. See data/SOURCES.md.
+
+Fonts, loaded at run time from Google Fonts (not bundled)
+  Atkinson Hyperlegible (Braille Institute of America), Big Shoulders Display
+  (The Big Shoulders Project Authors) and IBM Plex Mono (IBM Corp.), each under
+  the SIL Open Font Licence 1.1.
+  When the fonts can't load, the game falls back to system fonts.
+
+Used to build the game (not included in it)
+-------------------------------------------
+d3-geo 3.1.1 (https://github.com/d3/d3-geo)
+  Copyright 2010-2024 Mike Bostock. ISC licence.
+topojson-client 3.1.0 and topojson-simplify 3.0.3 (https://github.com/topojson)
+  Copyright 2012-2019 Michael Bostock. ISC licence.
+esbuild 0.28 (https://github.com/evanw/esbuild)
+  Copyright (c) 2020 Evan Wallace. MIT licence.
+
+Used to test the game (not included in it)
+------------------------------------------
+axe-core 4.14 (https://github.com/dequelabs/axe-core)
+  By Deque Systems, Inc. Mozilla Public Licence 2.0.
+Playwright (https://github.com/microsoft/playwright-python)
+  Copyright (c) Microsoft Corporation. Apache Licence 2.0.
+
+The full licence texts are included with each package in node_modules (after
+npm install) and in each project's repository.

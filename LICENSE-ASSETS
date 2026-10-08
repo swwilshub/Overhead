@@ -1,0 +1,26 @@
+Overhead game content, art and text
+Copyright (c) 2026 swwilshub and the Overhead contributors
+
+Licensed under the Creative Commons Attribution 4.0 International licence
+(CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
+Full legal text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+This licence covers the game's content rather than its program code:
+
+  - the game world in data/world.json: item, line, job, trait, office, event and
+    scenario names, descriptions, recipes and numbers (the city populations and
+    coordinates in it come from the US Census Bureau and are public domain; see
+    data/SOURCES.md);
+  - the in-game writing: memos, help text and descriptions;
+  - the pixel-art designs the game draws: machines, tool heads, offices, cells,
+    people and buildings;
+  - the documentation in docs/ and the images in docs/images/.
+
+The program code that draws the art and runs the game (everything under src/,
+tools/ and test/) is under the MIT licence in LICENSE. Where a file holds both
+(for example, text written inside a .js file), you may use the code under MIT
+and the text and art under CC BY 4.0.
+
+To credit the work, a line such as this is enough:
+  "Contains material from Overhead (https://github.com/swwilshub/Overhead),
+   licensed under CC BY 4.0."

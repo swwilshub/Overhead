@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Content scan
+        run: npm run scan
+      - name: Build
+        run: npm run build
+      - name: Generated data is up to date
+        run: git diff --exit-code -- src/gen/data.js
+      - name: Simulation tests
+        run: npm run test:node
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Browser and accessibility tests
+        run: npm run test:ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: overhead-build
+          path: |
+            dist/overhead.html
+            test/shots/
+          if-no-files-found: ignore
