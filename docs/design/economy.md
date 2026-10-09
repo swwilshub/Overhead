@@ -61,12 +61,21 @@ A machine's rated output is its price × `outputRate` (0.8%) in dollars of produ
 that ÷ the product's base unit price. Actual output is the rating × efficiency. Efficiency is set by:
 
 - the operator's skill and morale;
-- a Floor Supervisor's boost;
+- an Operations Director's boost (the floor foreman; not stacked, averaged over foremen);
 - the machine's service level (credits, kept up by a mechanic);
 - time lost carrying boxes;
 - materials running out, or the output tray filling.
 
 A typical hand-fed machine with a mid-skill operator runs at 55–70%. Belts, pallet jacks and forklifts raise that.
+
+## Seniority
+
+Every job is one of three levels. The level sets the job's pay (a multiple of the city average) and a skill
+bonus (+0.10 per level above Junior, plus up to 0.08 across the level as experience builds). Someone with a post earns
+`min(1, workedMinutes / 480) × (0.7 + 0.6 × jobFit)` experience a day. A Junior becomes a Senior at 130 and a Senior a
+Director at 560. A promotion keeps the person's place on the city pay scale (their `payRatio`), so a promotion lifts
+their pay by the ratio between the two jobs' city averages, and adds morale. Costs: the payroll is about 50% above an
+unpromoted one by month 24 in the test games. Details and measurements are in [balance.md](balance.md).
 
 ## Why this shape
 

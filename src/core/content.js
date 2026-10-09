@@ -1,9 +1,9 @@
 // People, places and text that the generated world data doesn't cover: applicant names, street and company names.
 // Jobs, departments and traits come from data/world.json via src/gen/data.js; this module adds the lookups the
 // simulation uses.
-import { JOBS as JOB_LIST, DEPTS as DEPT_LIST, ATTR_GROUPS, DRAWBACK_TRAITS } from '../gen/data.js';
+import { JOBS as JOB_LIST, JOB_FAMILIES, DEPTS as DEPT_LIST, ATTR_GROUPS, DRAWBACK_TRAITS } from '../gen/data.js';
 
-export { ATTR_GROUPS, JOB_LIST, DEPT_LIST };
+export { ATTR_GROUPS, JOB_LIST, JOB_FAMILIES, DEPT_LIST };
 export const ATTRS = ATTR_GROUPS.flatMap(([, a]) => a.map(([k]) => k));
 export const ATTR_LABEL = Object.fromEntries(ATTR_GROUPS.flatMap(([, a]) => a));
 // Traits where a high score is a problem, not a strength.
@@ -16,6 +16,15 @@ export const DEPTS = Object.fromEntries(DEPT_LIST.map(d => [d.key, d]));
 export const deptName = key => DEPTS[key]?.name ?? key;
 export const deptColor = key => DEPTS[key]?.color ?? '#8a929a';
 export const hasRole = (e, role) => !!JOBS[e.job]?.roles.includes(role);
+// Seniority (spec 010): each family of jobs has three levels, each its own job record, keyed family_level. The Plant
+// Director has no family and is level 0, "not laddered".
+export const LEVEL_NAME = ['', 'Junior', 'Senior', 'Director'];
+export const levelOf = e => JOBS[e.job]?.level || 0;
+export const jobAt = (family, level) => JOBS[`${family}_${level}`] || null;
+export const ladder = family => JOB_LIST.filter(j => j.family === family).sort((a, b) => a.level - b.level);
+export const familyName = key => JOB_FAMILIES.find(f => f.key === key)?.name ?? key;
+// the jobs an advert can be placed for: each family, then the Plant Director
+export const AD_TARGETS = [...JOB_FAMILIES.map(f => ({ key: f.key, name: f.name, dept: f.dept })), { key: 'director', name: JOB_LIST.find(j => j.key === 'director').title, dept: 'exec' }];
 // the first job (in list order) that has a role, e.g. the job to suggest hiring for it
 export const jobFor = role => JOB_LIST.find(j => j.roles.includes(role) && !j.lead) || JOB_LIST.find(j => j.roles.includes(role));
 // floor jobs that can run a production machine or work in a cell

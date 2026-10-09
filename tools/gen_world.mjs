@@ -81,6 +81,19 @@ for (const j of W.jobs) {
   if (!deptKeys.has(j.dept)) fail(`job ${j.key}: unknown department "${j.dept}"`);
   for (const k of Object.keys(j.w)) if (!traitKeys.has(k)) fail(`job ${j.key}: unknown trait "${k}"`);
 }
+// seniority ladders: every family has levels 1, 2 and 3 in order, each in the family's department
+const famKeys = new Set((W.jobFamilies || []).map(f => f.key));
+uniq([...famKeys], 'job family');
+for (const f of W.jobFamilies) {
+  if (!deptKeys.has(f.dept)) fail(`job family ${f.key}: unknown department "${f.dept}"`);
+  const rungs = W.jobs.filter(j => j.family === f.key).sort((a, b) => a.level - b.level);
+  if (rungs.length !== 3 || rungs.some((j, i) => j.level !== i + 1 || j.key !== `${f.key}_${i + 1}`)) fail(`job family ${f.key} must have exactly three jobs, ${f.key}_1 to ${f.key}_3, with levels 1 to 3`);
+  for (const j of rungs) if (j.dept !== f.dept) fail(`job ${j.key}: department must be the family's ("${f.dept}")`);
+  if (rungs.length === 3 && !(rungs[0].pay < rungs[1].pay && rungs[1].pay < rungs[2].pay)) fail(`job family ${f.key}: pay must rise with each level`);
+}
+for (const j of W.jobs) if (j.family && !famKeys.has(j.family)) fail(`job ${j.key}: unknown family "${j.family}"`);
+const sen = W.economy.seniority;
+if (!sen || !(sen.xpToSenior > 0 && sen.xpToDirector > sen.xpToSenior) || sen.resumeLevels?.length !== 3 || Math.abs(sen.resumeLevels.reduce((a, b) => a + b, 0) - 1) > 1e-9) fail('economy.seniority needs xpToSenior < xpToDirector and three resumeLevels that add up to 1');
 for (const role of ['chief', 'finance', 'sales', 'marketing', 'purchasing', 'foreman', 'operator', 'research_lead', 'researcher', 'maintenance'])
   if (!W.jobs.some(j => [j.role].flat().includes(role))) fail(`no job has the "${role}" role`);
 for (const e of W.events.demand) for (const k of e.items) if (byKey[k]?.tier !== 'product') fail(`event ${e.key}: "${k}" is not a product`);
@@ -109,7 +122,7 @@ export const ECONOMY = ${J(W.economy)};
 export const DEPTS = ${J(W.departments)};
 export const ATTR_GROUPS = ${J(W.traits.map(g => [g.group, g.traits]))};
 export const DRAWBACK_TRAITS = ${J(W.drawbackTraits)};
-${rows('JOBS', W.jobs.map((j, id) => ({ id, ...j, roles: [j.role].flat(), lead: !!j.lead })))}${rows('OFFICES', W.offices)}
+${rows('JOBS', W.jobs.map((j, id) => ({ id, ...j, roles: [j.role].flat(), lead: !!j.lead, next: j.family && j.level < 3 ? `${j.family}_${j.level + 1}` : null })))}${rows('JOB_FAMILIES', W.jobFamilies)}${rows('OFFICES', W.offices)}
 export const EQUIPMENT = ${J(W.equipment)};
 export const EVENTS = ${J({ ...W.events, demand: W.events.demand.map(e => ({ ...e, items: e.items.map(k => itemIdx[k]) })) })};
 ${rows('SCENARIOS', W.scenarios)}

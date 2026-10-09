@@ -5,5 +5,9 @@ export const BANDS = {
   endMax: 18,           // ...and at most this many (no runaway money)
   salesGrowth: 1.4,     // monthly sales in months 19-24 are at least this many times months 4-9
   maxMonthlyGain: 1.3,  // no single month adds more than this multiple of the starting money
+  promotionsPerDay: 3,  // the plant never promotes more than this many people in one game day
+  firstSenior: [5, 8],  // months until the first Senior (a hire in month 1)
+  firstDirector: [18, 24], // months until the first Director
+  payUp: [0.35, 0.65],  // payroll after 24 months against the same people unpromoted (everyone reaches Senior in the first year)
   price: [0.6, 1.55],   // every market price stays within this band of the item's base unit price
 };

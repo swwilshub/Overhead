@@ -2,7 +2,7 @@
 import { spawnSync } from 'child_process';
 import path from 'path';
 const here = path.dirname(new URL(import.meta.url).pathname);
-const TESTS = ['blurb', 'names', 'stall', 'belt', 'flow', 'cells', 'suites', 'move', 'paths', 'spend', 'saves', 'perf', 'long'];
+const TESTS = ['blurb', 'names', 'seniority', 'stall', 'belt', 'flow', 'cells', 'suites', 'move', 'paths', 'spend', 'saves', 'perf', 'long'];
 let failed = [];
 for (const t of TESTS) {
   const t0 = Date.now();

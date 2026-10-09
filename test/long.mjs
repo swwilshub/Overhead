@@ -7,12 +7,15 @@ import * as G from '../src/sim/game.js';
 import { ITEMS, RECIPES, CITIES, ECONOMY, ITEM_ID, FAMILY_ID, FAMILIES } from '../src/gen/data.js';
 import { inputPorts, ZONE, KINDS } from '../src/sim/floor.js';
 import { vendorsFor, lineOutlook } from '../src/sim/world.js';
+import { marketSalary } from '../src/sim/people.js';
+import { JOBS } from '../src/core/content.js';
 import { money, fmtDate, monthKey } from '../src/core/util.js';
 import { ok, done, hire, cityId, isMaterial, job } from './lib.mjs';
 import { BANDS } from './balance.mjs';
 
 const [, , seedArg, cityArg, diffArg] = process.argv;
 const verbose = !!seedArg;
+if (process.env.NOLEARN) { ECONOMY.seniority.xpToSenior = ECONOMY.seniority.xpToDirector = 1e9; } // measurement aid: the same plant with nobody learning
 
 // What a reasonable player builds: the line that looks most profitable in this city's market right now, among
 // products we can source (materials, components sold in town, or things we already make). A new line has to pay
@@ -60,8 +63,23 @@ function run(seed, cityName, difficulty) {
   const checkNaN = (o, path = '') => { for (const [k, v] of Object.entries(o)) { if (typeof v === 'number' && !Number.isFinite(v)) throw new Error('NaN at ' + path + k); if (v && typeof v === 'object') checkNaN(v, path + k + '.'); } };
   let lastM = monthKey(st.time), grew = 0, overLimit = 0, stallMax = 0, stallTotal = 0;
   const months = [];
+  // seniority: who is on which rung, and when each rung is first reached
+  const rung = new Map(), firstJob = new Map();
+  const climb = { total: 0, perDayMax: 0, firstSenior: null, firstDirector: null };
+  const watchClimb = day => {
+    let today = 0;
+    for (const e of st.employees) {
+      const lv = JOBS[e.job].level;
+      if (!firstJob.has(e.id)) firstJob.set(e.id, e.job);
+      const was = rung.get(e.id) ?? lv;
+      if (lv > was) { today++; if (lv === 2 && climb.firstSenior == null) climb.firstSenior = day; if (lv === 3 && climb.firstDirector == null) climb.firstDirector = day; }
+      rung.set(e.id, lv);
+    }
+    climb.total += today; climb.perDayMax = Math.max(climb.perDayMax, today);
+  };
   for (let d = 0; d < 731 && !st.over; d++) {
     G.advance(st, 1440);
+    watchClimb(d + 1);
     if (d % 7 === 4) G.purchaseAll(st);
     let stallToday = 0; // "Machine stopped" notices that arrived today (the plant may send at most three a day)
     for (const m of st.memos) if (!m.seen) { m.seen = 1; if (/^(Machine stopped|\d+ machines stopped)/.test(m.subject)) stallToday++; if (m.kind === 'raise' && !m.data.done) G.answerRaise(st, m.id, true); }
@@ -113,10 +131,19 @@ function run(seed, cityName, difficulty) {
     console.log('over', st.over, 'score', money(G.score(st)), 'lines', machines.map(o => ITEMS[RECIPES[o.recipe].out].name).join(', '));
     console.log('save bytes', JSON.stringify(st).length, 'firms alive', st.city.firms.filter(f => f.alive).length, '/', st.city.firms.length);
   }
-  return { st, start, months, overLimit, priceRatios, machines, stallMax, stallTotal };
+  // payroll against what the same people would cost had nobody been promoted, and units made per employee per month
+  const staffed = st.employees.filter(e => JOBS[e.job].level);
+  const pay = staffed.reduce((a, e) => a + e.salary, 0);
+  const flat = staffed.reduce((a, e) => a + e.salary * marketSalary(st, firstJob.get(e.id) || e.job) / marketSalary(st, e.job), 0);
+  const tail = months.slice(-6), perHead = tail.reduce((a, x) => a + x.made / Math.max(1, x.staff), 0) / Math.max(1, tail.length);
+  return { st, start, months, overLimit, priceRatios, machines, stallMax, stallTotal, climb, payUp: flat ? pay / flat - 1 : 0, perHead };
 }
 
-if (verbose) { run(seedArg, cityArg || 'Dayton', diffArg || 'normal'); process.exit(0); }
+if (verbose) {
+  const r = run(seedArg, cityArg || 'Dayton', diffArg || 'normal');
+  console.log('promotions', r.climb.total, 'first Senior day', r.climb.firstSenior, 'first Director day', r.climb.firstDirector, 'pay up', (r.payUp * 100).toFixed(0) + '%', 'made/head/month', r.perHead.toFixed(1));
+  process.exit(0);
+}
 
 // ---- the balance check: several seeds and cities, every run inside the bands
 const runs = [['long1', 'Dayton'], ['long2', 'Grand Rapids'], ['long3', 'Tulsa']];
@@ -135,5 +162,12 @@ for (const [seed, city] of runs) {
   ok(worst <= BANDS.maxMonthlyGain, `${tag}: no runaway month (largest one-month gain ${worst.toFixed(2)}× the start, limit ${BANDS.maxMonthlyGain}×)`);
   const [lo, hi] = [Math.min(...r.priceRatios), Math.max(...r.priceRatios)];
   ok(lo >= BANDS.price[0] && hi <= BANDS.price[1], `${tag}: market prices stay within ${BANDS.price[0]}–${BANDS.price[1]}× base (${lo.toFixed(2)}–${hi.toFixed(2)})`);
+  // seniority (spec 013)
+  const c = r.climb, mo = d => d == null ? null : d / 30.4;
+  ok(c.total >= 1, `${tag}: ${c.total} promotions in two years`);
+  ok(c.perDayMax <= BANDS.promotionsPerDay, `${tag}: at most ${BANDS.promotionsPerDay} promotions on any day (most ${c.perDayMax})`);
+  ok(mo(c.firstSenior) != null && mo(c.firstSenior) >= BANDS.firstSenior[0] && mo(c.firstSenior) <= BANDS.firstSenior[1], `${tag}: first Senior in month ${mo(c.firstSenior)?.toFixed(1)} (band ${BANDS.firstSenior.join('–')})`);
+  ok(mo(c.firstDirector) != null && mo(c.firstDirector) >= BANDS.firstDirector[0] && mo(c.firstDirector) <= BANDS.firstDirector[1], `${tag}: first Director in month ${mo(c.firstDirector)?.toFixed(1)} (band ${BANDS.firstDirector.join('–')})`);
+  ok(r.payUp >= BANDS.payUp[0] && r.payUp <= BANDS.payUp[1], `${tag}: promotions lift the payroll by ${(r.payUp * 100).toFixed(0)}% (band ${BANDS.payUp.map(x => x * 100).join('–')}%)`);
 }
 done('balance');

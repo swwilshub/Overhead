@@ -38,9 +38,10 @@ A **family** is a line of work (Operations, Maintenance, Engineering, Finance, S
    Roles are as the old jobs had them (operator, researcher, maintenance, finance, sales, marketing, purchasing); the
    level 3 jobs add the supervising or leading role the old manager jobs had. Level 3 Engineering is a desk job, as
    the old Chief Engineer was. Every name passes `npm run scan`; any that does not is replaced, not allowlisted.
-2. **Experience.** Each employee has `xp`. At the end of each workday they earn
+2. **Experience.** Each employee has `xp`. Someone with a post (a machine, cell, desk or office, or the work of a mechanic or
+   supervisor, which has no post) earns, at the end of each workday,
    `min(1, minutes worked ÷ 480) × (0.7 + 0.6 × job fit)` points, so a full day at an average fit earns about one.
-   Constants in `economy.seniority`: `xpToSenior = 130`, `xpToDirector = 430` (about 6 and 20 months of steady work).
+   Constants in `economy.seniority`: `xpToSenior = 130`, `xpToDirector = 560` (about 6 months for a Senior and 22 to 30 for a Director, by how well the person suits the job).
 3. **Promotion is automatic.** When `xp` reaches the next threshold the employee's job becomes `next`. Their salary
    keeps the same ratio to the city average for the new job (so a well-paid junior becomes a well-paid senior), their
    last-raise date resets, their morale lifts a little, and a non-urgent memo from Personnel says who is now what.
