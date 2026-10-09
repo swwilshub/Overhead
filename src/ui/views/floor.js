@@ -11,7 +11,7 @@ import { money, num, pct, minuteOfDay, fmtShortDate, fmtDate } from '../../core/
 import { buyDialog } from './business.js';
 import { sfx } from '../sound.js';
 import { makeView, screenToTile, drawScene, tileXY, itemColor, T as TILE } from '../topdown.js';
-import { confirmCredit, creditToAsk, creditWords } from '../credit.js';
+import { confirmCredit, creditToAsk } from '../credit.js';
 import { editing, editorPrimary, editorKey, editorPanel, editorDraw, speakCell, cancelEditor, startEditCell, cellMetrics, suiteMetrics } from './cellEditor.js';
 import { analyseSuite } from '../../sim/suites.js';
 import { workSquare, isStation, itemDef, METRICS } from '../../sim/cells.js';
@@ -420,9 +420,11 @@ async function layBelt(st, from, to, k) {
   const dry = G.connectByBelt(st, from, to, true, k);
   if (!dry.ok) { act(dry); return; }
   const port = dry.k != null ? `input ${dry.k + 1} of ` : '';
-  const need = dry.tiles ? creditToAsk(st, dry.price) : 0;
   const text = `${dry.tiles} conveyor sections from ${nameOf(st, from)} to ${port}${nameOf(st, to)}, for ${money(dry.price)}.`;
-  if (dry.tiles && !(await confirmBox('Lay this belt?', need ? [text, ' ', ...creditWords(st, dry.price)] : text, need ? `Lay belt and borrow ${money(need)}` : `Lay belt (${money(dry.price)})`, !!need))) return;
+  if (dry.tiles) {
+    if (creditToAsk(st, dry.price)) { if (!(await confirmCredit(st, dry.price, { title: 'Lay this belt?', lead: text + ' ', yes: n => `Lay belt and borrow ${money(n)}` }))) return; }
+    else if (!(await confirmBox('Lay this belt?', text, `Lay belt (${money(dry.price)})`))) return;
+  }
   const res = G.connectByBelt(st, from, to, false, k);
   if (res.ok) { sfx('belt'); act({ ok: true, msg: res.linked?.length ? res.linked.map(l => l.text).join(' ') : (res.msg || `Laid ${res.tiles} sections.`) }, false, 'ok'); }
   else act(res);
