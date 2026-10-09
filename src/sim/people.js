@@ -1,5 +1,5 @@
 // Employees and applicants: traits, job fit, pay expectations, daily schedules, morale.
-import { ATTRS, NEGATIVE_ATTRS, JOBS, JOB_LIST, FIRST_M, FIRST_F, LAST, FIRM_PREFIX, FIRM_SUFFIX } from '../core/content.js';
+import { ATTRS, NEGATIVE_ATTRS, JOBS, JOB_LIST, levelOf, FIRST_M, FIRST_F, LAST, FIRM_PREFIX, FIRM_SUFFIX } from '../core/content.js';
 import { ECONOMY } from '../gen/data.js';
 import { rand, randInt, pick, chance, clamp, gauss } from '../core/util.js';
 
@@ -12,14 +12,29 @@ export function jobFit(attrs, jobKey) {
 }
 export function marketSalary(st, jobKey) { return Math.round(st.city.avgSalary * JOBS[jobKey].pay / 100) * 100; }
 
+// ---- seniority (spec 010): experience points, the level they add up to, and the skill that learning adds
+const SEN = ECONOMY.seniority;
+// the experience a person has when they reach a level (1 Junior, 2 Senior, 3 Director)
+export const xpFloor = level => level >= 3 ? SEN.xpToDirector : level === 2 ? SEN.xpToSenior : 0;
+// how far through their level they are, 0 to 1 (a Director is at the top of the ladder)
+export function levelProgress(e) {
+  const lv = levelOf(e); if (lv >= 3) return 1; if (lv < 1) return 0;
+  return clamp(((e.xp || 0) - xpFloor(lv)) / (xpFloor(lv + 1) - xpFloor(lv)), 0, 1);
+}
+// the skill learning adds on top of a person's job fit
+export const growthFor = (level, progress) => level < 1 ? 0 : SEN.growthPerLevel * (level - 1) + SEN.growthWithinLevel * progress;
+// what a worked day earns: a full day at an average fit is about one point, better fits learn faster
+export const dailyXp = (e, fit) => clamp((e.workedMin || 0) / 480, 0, 1) * (0.7 + 0.6 * fit);
+
 export function makeCandidate(st, jobKey) {
+  const level = levelOf({ job: jobKey }) || 1;   // an applicant for a Senior or Director job is a more experienced person
   const female = chance(st, 0.5);
   const attrs = ATTRS.map(() => clamp(Math.round(gauss(st, 50, 17)), 3, 99));
   // applicants who answer an ad usually have some background in the field
-  const bias = rand(st, -6, 26) + st.city.f * 3;
+  const bias = rand(st, -6, 26) + st.city.f * 3 + (level - 1) * 4;
   for (const k of Object.keys(JOBS[jobKey].w)) { const i = ATTRS.indexOf(k); attrs[i] = clamp(Math.round(attrs[i] + (NEGATIVE_ATTRS.has(k) ? -bias : bias)), 3, 99); }
   const fit = jobFit(attrs, jobKey);
-  const years = clamp(Math.round(gauss(st, st.city.experience / 12 + 4, 4)), 0, 35);
+  const years = clamp(Math.round(gauss(st, st.city.experience / 12 + 4 + (level - 1) * 3, 4)), 0, 35);
   const age = clamp(19 + years + randInt(st, 0, 14), 19, 66);
   const ask = Math.round(marketSalary(st, jobKey) * (0.82 + fit * 0.38 + Math.min(years, 20) * 0.006) * rand(st, 0.95, 1.06) / 500) * 500;
   const history = [];
@@ -32,7 +47,7 @@ export function makeCandidate(st, jobKey) {
   }
   return {
     first: pick(st, female ? FIRST_F : FIRST_M), last: pick(st, LAST), female, age, years,
-    attrs, job: jobKey, ask, history,
+    attrs, job: jobKey, level, ask, history,
     fitEstimate: clamp(Math.round((fit + gauss(st, 0, 0.05)) * 100), 1, 99),
   };
 }
@@ -41,7 +56,7 @@ export function hire(st, cand, salary) {
   const e = {
     id: st.nextId++, first: cand.first, last: cand.last, female: cand.female, age: cand.age, years: cand.years,
     attrs: cand.attrs, job: cand.job, salary, hired: st.time, lastReview: st.time, lastRaise: st.time,
-    morale: 62, stress: 12, growth: 0, assign: null, injuredUntil: 0, log: [], schedule: null, x: null, y: null,
+    morale: 62, stress: 12, xp: xpFloor(levelOf({ job: cand.job })), growth: growthFor(levelOf({ job: cand.job }), 0), assign: null, injuredUntil: 0, log: [], schedule: null, x: null, y: null,
     accruedDays: 0,
   };
   st.employees.push(e);

@@ -151,7 +151,7 @@ async def main():
         async def to(v):
             await open_menu(pg); await pg.tap(f'dialog.menu-sheet [data-key="nav-{v}"]'); await pg.wait_for_timeout(350)
         await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(300)
-        await to('hire')
+        await to('nation')
         d = await pg.evaluate("() => { const td = document.querySelector('.table-wrap td[data-label]:not([data-label=\"\"])'), tr = td.closest('tr'), th = document.querySelector('.table-wrap thead'); const r = th.getBoundingClientRect(); return { tr: getComputedStyle(tr).display, td: getComputedStyle(td).display, label: td.dataset.label, thead: [r.width, r.height], rowW: tr.getBoundingClientRect().width, vw: innerWidth, role: document.querySelector('.table-wrap table').getAttribute('role') }; }")
         ok(d['tr'] == 'block' and d['td'] == 'flex' and d['label'] and d['thead'][0] <= 1 and d['rowW'] <= d['vw'] - 20, f'a table is a list of cards ({d})')
         roles = await pg.evaluate("() => ({ table: document.querySelectorAll('.table-wrap table[role=table]').length, rows: document.querySelectorAll('.table-wrap tr[role=row]').length, ch: document.querySelectorAll('.table-wrap th[role=columnheader]').length, rh: document.querySelectorAll('.table-wrap th[role=rowheader]').length, cells: document.querySelectorAll('.table-wrap td[role=cell]').length })")
@@ -209,7 +209,7 @@ async def main():
             await to(v); await axe_check(pg, f'phone {v}')
         # ---- the desktop tables are unchanged
         dd = await b.new_context(viewport={'width': 1280, 'height': 800}); dp = await dd.new_page(); await dp.goto(URL); await dp.wait_for_timeout(500); await dp.click('text=Quick start'); await dp.wait_for_timeout(600)
-        await dp.click('nav.rail a[href="#hire"]'); await dp.wait_for_timeout(300)
+        await dp.click('nav.rail a[href="#nation"]'); await dp.wait_for_timeout(300)
         dt = await dp.evaluate("() => ({ td: getComputedStyle(document.querySelector('.table-wrap td')).display, role: document.querySelector('.table-wrap table').getAttribute('role'), menu: document.querySelectorAll('.sort-menu').length })")
         ok(dt['td'] == 'table-cell' and dt['role'] is None and dt['menu'] == 0, f'desktop: tables are tables ({dt})')
         await dd.close()

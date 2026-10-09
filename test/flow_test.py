@@ -51,7 +51,7 @@ async def main():
         await pg.keyboard.press('Enter'); await pg.wait_for_timeout(300); print('paint:', await live())
         print('setup issues:', await pg.locator('.notice').count() and await pg.locator('.notice').first.inner_text())
         # hiring: place an ad for operator and run to next morning
-        await pg.click('nav.rail a[href="#hire"]'); await pg.click('[data-key="ad-line_worker"]'); await pg.wait_for_timeout(200)
+        await pg.click('nav.rail a[href="#hire"]'); await pg.click('[data-key="ad-operations"]'); await pg.wait_for_timeout(200)
         await pg.click('.status .run button:has-text("Run until")'); await pg.click('dialog button:has-text("Next morning")'); await pg.wait_for_timeout(3000)
         await pg.click('nav.rail a[href="#hire"]'); await pg.wait_for_timeout(300)
         n = await pg.locator('[data-key^="res-"]').count(); print('resumes:', n)

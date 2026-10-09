@@ -1,17 +1,17 @@
 // Core game state and the simulation clock.
 import { ITEMS, RECIPES, FAMILIES, CITIES, ECONOMY, SCENARIOS as SCENARIO_LIST, EVENTS } from '../gen/data.js';
-import { JOBS, DEPTS, ATTRS, hasRole, canRunMachine, jobFor, aOrAn } from '../core/content.js';
+import { JOBS, DEPTS, ATTRS, hasRole, canRunMachine, jobFor, aOrAn, levelOf, AD_TARGETS } from '../core/content.js';
 const A = (e, k) => e.attrs[ATTRS.indexOf(k)];
 import { rand, randInt, pick, chance, clamp, hashSeed, dayIndex, minuteOfDay, isWorkday, weekday, monthKey, dateOf, money, num, plural, fmtShortDate, MIN_PER_DAY } from '../core/util.js';
 import { generateCity, recomputeMarket, vendorsFor, unitsPerHour, WORKDAYS_PER_MONTH, DIFF, bestMarkets } from './world.js';
 import { newFloor, ports, inputPorts, portItem, links, autoRoute, isProducer, storageCapacity, ZONE, OFFICES, priceOf, placementProblem, footprint, countKind, objectLabel, KINDS } from './floor.js';
-import { makeCandidate, hire, skill, payRatio, fullName, isWhite, planDay, activityAt, marketSalary, WORK_START, WORK_END } from './people.js';
+import { makeCandidate, hire, skill, payRatio, fullName, isWhite, planDay, activityAt, marketSalary, jobFit, xpFloor, growthFor, levelProgress, dailyXp, WORK_START, WORK_END } from './people.js';
 import { monthlyEvents, advisorReport } from './events.js';
 import { analyse, cellPrice, itemDef, REQUIRED, MIN_SIZE, MAX_SIZE, TECHS, CELL_ITEMS, techDone } from './cells.js';
 import { analyseSuite, suitePrice, SUITE_REQUIRED, SUITE_MIN, SUITE_MAX } from './suites.js';
 import { STATUS, BOX_GAP, BUF_BOXES, starvedInputs, outputBlock, stallOf, beltStock, staffedBy } from './stalls.js';
 
-export const VERSION = 1;
+export const VERSION = 2;
 export const SCENARIOS = Object.fromEntries(SCENARIO_LIST.map(sc => [sc.key, sc]));
 export const DEFAULT_SCENARIO = SCENARIO_LIST[0].key;
 const BANK = ECONOMY.bank.name;
@@ -495,12 +495,27 @@ function techStep(st, dt) {
   }
 }
 
+// Version 2 (spec 010): the fourteen separate jobs became seniority ladders. Each old job is the nearest (family, level);
+// people start with the experience their level begins at, and adverts and waiting resumes are read the same way.
+const JOB_V1 = { line_worker: 'operations_1', supervisor: 'operations_3', mechanic: 'maintenance_1', dev_engineer: 'engineering_1', chief_engineer: 'engineering_3',
+  office_assistant: 'finance_1', bookkeeper: 'finance_2', finance_chief: 'finance_3', account_rep: 'sales_1', commercial_lead: 'sales_3', promotions: 'promotions_1',
+  buyer: 'purchasing_1', supply_lead: 'purchasing_3', director: 'director' };
+function toLadders(st) {
+  for (const e of st.employees || []) {
+    const was = e.job; e.job = JOB_V1[e.job] || e.job;
+    if (was === 'chief_engineer') e.assign = null;            // the old Chief Engineer sat at a desk; the Engineering Director stays on the floor
+    const lv = levelOf(e); e.xp = xpFloor(lv); e.growth = growthFor(lv, 0);
+  }
+  st.ads = (st.ads || []).map(a => ({ family: a.family || JOBS[JOB_V1[a.job] || a.job]?.family || 'director', placed: a.placed, until: a.until }));
+  for (const m of st.memos || []) if (m.kind === 'resume' && m.data?.cand) { const c = m.data.cand; c.job = JOB_V1[c.job] || c.job; c.level = levelOf(c) || 1; }
+}
 // Bring older saves up to date. Each format change bumps VERSION and adds a step here, oldest first, with a fixture
 // in test/fixtures/ that test/saves.mjs loads.
 export function migrate(st) {
   if (!st) return st;
   if ((st.v || 1) > VERSION) throw new Error(`This save comes from a newer version of the game (format ${st.v}).`);
   if (st.floor) st.cellTech = st.cellTech || { done: {}, active: null };
+  if ((st.v || 1) < 2) toLadders(st);
   st.v = VERSION;
   if (st.floor && st.phase === 'play') refreshOperators(st); // old status words ("Input empty", "Shift over") give way to the current ones
   return st;
@@ -712,6 +727,25 @@ function trackStalls(st, machines, ran, inShift, t, dt) {
   }
   for (const { s } of due) { s.sent = true; s.last = t; }
 }
+// ---------------- learning and promotion (spec 010)
+// Each worked day earns experience; at the thresholds a person steps up a level on their own, keeping their place on the
+// pay scale, and the skill they have learned shows in `growth`.
+function learn(st, e) {
+  if (!JOBS[e.job]?.family) return;                           // the Plant Director has nowhere to climb
+  if (e.assign == null && !hasRole(e, 'maintenance') && !hasRole(e, 'foreman')) return;   // no post, no learning (mechanics and supervisors work without one)
+  e.xp = (e.xp ?? xpFloor(levelOf(e))) + dailyXp(e, jobFit(e.attrs, e.job));
+  const from = JOBS[e.job];
+  if (from.next && e.xp >= xpFloor(from.level + 1)) promote(st, e, from, JOBS[from.next]);
+  e.growth = growthFor(levelOf(e), levelProgress(e));
+}
+function promote(st, e, from, to) {
+  const ratio = payRatio(st, e), was = e.salary;                // before the job changes
+  e.job = to.key;
+  e.salary = Math.round(marketSalary(st, e.job) * ratio / 100) * 100;
+  e.lastRaise = st.time; e.morale = clamp(e.morale + 6, 0, 100);
+  memo(st, { from: 'Personnel', subject: `${fullName(e)} is now ${aOrAn(to.title)}`,
+    body: `${fullName(e)} has learned the work and moves up from ${from.title} to ${to.title}. Pay goes from ${money(was)} to ${money(e.salary)} a year, in line with the city's pay for the new job. ${to.level === 3 ? 'That is the top of the ladder.' : 'The next step is Director.'}` });
+}
 export function terminate(st, empId) {
   const i = st.employees.findIndex(e => e.id === empId); if (i < 0) return { ok: false };
   const e = st.employees[i];
@@ -732,12 +766,21 @@ export function review(st, empId, raisePct) {
   e.morale = clamp(e.morale - 4, 0, 100);
   return { ok: true, msg: `${fullName(e)} was reviewed without a raise.` };
 }
-export function placeAd(st, jobId) {
-  if (st.ads.some(a => a.job === jobId && a.until > st.time)) return { ok: false, msg: `An ad for ${JOBS[jobId].title} is already running.` };
-  const cost = JOBS[jobId].lead ? 550 : 300;
-  st.ads.push({ job: jobId, placed: st.time, until: st.time + 7 * MIN_PER_DAY });
-  pay(st, cost, 'misc', `Help-wanted ad: ${JOBS[jobId].title}`);
-  return { ok: true, msg: `Ad placed for ${JOBS[jobId].title} (${money(cost)}). Resumes will arrive in the In-basket over the next week.` };
+// One advert per family of jobs (or for the Plant Director); who answers it, and at which level, is luck (spec 011).
+export function placeAd(st, family) {
+  const t = AD_TARGETS.find(x => x.key === family); if (!t) return { ok: false, msg: 'There is no such job to advertise.' };
+  if (st.ads.some(a => a.family === family && a.until > st.time)) return { ok: false, msg: `An ad for ${t.name} is already running.` };
+  const cost = family === 'director' ? ECONOMY.seniority.directorAdCost : ECONOMY.seniority.adCost;
+  st.ads.push({ family, placed: st.time, until: st.time + 7 * MIN_PER_DAY });
+  pay(st, cost, 'misc', `Help-wanted ad: ${t.name}`);
+  return { ok: true, msg: `Ad placed for ${t.name} (${money(cost)}). Resumes will arrive in the In-basket over the next week.` };
+}
+// the level of an applicant: mostly Juniors, sometimes a Senior, rarely a Director
+export function applicantJob(st, family) {
+  if (family === 'director') return 'director';
+  let r = rand(st, 0, 1); const w = ECONOMY.seniority.resumeLevels;
+  for (let i = 0; i < 3; i++) { r -= w[i]; if (r < 0) return `${family}_${i + 1}`; }
+  return `${family}_1`;
 }
 export function makeOffer(st, memoId, salary) {
   const m = st.memos.find(m => m.id === memoId); if (!m || m.kind !== 'resume' || m.data.hired || m.data.gone) return { ok: false, msg: 'That applicant is no longer available.' };
@@ -921,8 +964,8 @@ function startOfDay(st) {
     if (ad.until <= st.time) continue;
     const n = Math.floor(rand(st, 0, 1.2 + st.city.f * 0.9) + (st.time - ad.placed < MIN_PER_DAY ? 1 : 0));
     for (let i = 0; i < n; i++) {
-      const c = makeCandidate(st, ad.job);
-      memo(st, { from: `${c.first} ${c.last}`, subject: `Resume: ${JOBS[ad.job].title}`, kind: 'resume', data: { cand: c, expires: st.time + 14 * MIN_PER_DAY } });
+      const c = makeCandidate(st, applicantJob(st, ad.family));
+      memo(st, { from: `${c.first} ${c.last}`, subject: `Resume: ${JOBS[c.job].title}`, kind: 'resume', data: { cand: c, expires: st.time + 14 * MIN_PER_DAY } });
     }
   }
   st.ads = st.ads.filter(a => a.until > st.time);
@@ -1226,6 +1269,7 @@ function endOfDay(st) {
   const fore = emp.filter(e => hasRole(e, 'foreman'));
   for (const e of emp) {
     e.accruedDays = (e.accruedDays || 0) + 1;
+    learn(st, e);
     if (e.state === 'injured' && e.injuredUntil <= st.time) e.state = null;
     const pr = payRatio(st, e);
     let target = 58 + clamp((pr - 1) * 110, -35, 22);

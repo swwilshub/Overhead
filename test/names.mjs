@@ -18,32 +18,38 @@ const find = re => sources.flatMap(({ f, text }) => text.split('\n').map((l, i) 
 
 // ---- criterion 1 and 3: the new titles, departments and duties
 const want = {
-  line_worker: 'Machine Operator', account_rep: 'Sales Rep', promotions: 'Marketer', buyer: 'Materials Buyer',
-  office_assistant: 'Finance Clerk', finance_chief: 'Finance Manager', commercial_lead: 'Sales Manager',
-  supply_lead: 'Purchasing Manager', supervisor: 'Floor Supervisor', dev_engineer: 'Research Engineer',
-  bookkeeper: 'Bookkeeper', mechanic: 'Plant Mechanic', chief_engineer: 'Chief Engineer', director: 'Plant Director',
+  operations_1: 'Junior Operator', operations_2: 'Senior Operator', operations_3: 'Operations Director',
+  maintenance_1: 'Junior Mechanic', maintenance_2: 'Senior Mechanic', maintenance_3: 'Maintenance Director',
+  engineering_1: 'Junior Engineer', engineering_2: 'Senior Engineer', engineering_3: 'Engineering Director',
+  finance_1: 'Finance Clerk', finance_2: 'Bookkeeper', finance_3: 'Finance Director',
+  sales_1: 'Junior Sales Rep', sales_2: 'Senior Sales Rep', sales_3: 'Sales Director',
+  promotions_1: 'Junior Promoter', promotions_2: 'Senior Promoter', promotions_3: 'Promotions Director',
+  purchasing_1: 'Junior Buyer', purchasing_2: 'Senior Buyer', purchasing_3: 'Purchasing Director', director: 'Plant Director',
 };
 for (const [key, title] of Object.entries(want)) ok(JOBS[key]?.title === title, `job ${key} is titled "${title}" (${JOBS[key]?.title})`);
 const depts = Object.fromEntries(DEPT_LIST.map(d => [d.key, d.name]));
 ok(depts.exec === 'Management' && depts.commercial === 'Sales' && depts.supply === 'Purchasing', `departments: ${Object.values(depts).join(', ')}`);
-ok(JOB_LIST.length === 14 && JOB_LIST.every(j => want[j.key]), 'job keys are unchanged (14 jobs, same keys)');
+ok(JOB_LIST.length === 22 && JOB_LIST.every(j => want[j.key]), 'twenty-one laddered jobs and the Plant Director, with the keys family_level');
 const titles = JOB_LIST.map(j => j.title);
 ok(new Set(titles).size === titles.length, 'job titles are unique');
 for (const j of JOB_LIST) {
-  ok(j.title.length <= 18, `"${j.title}" is at most 18 characters`);
+  ok(j.title.length <= 20, `"${j.title}" is at most 20 characters`);
   ok(j.desc.length <= 120, `${j.title} duties are at most 120 characters (${j.desc.length})`);
 }
 // duties start with what the job does in the game
 const duties = {
-  line_worker: 'Runs one machine or works in a production cell', account_rep: 'Wins orders from stores', promotions: 'Runs ads and displays',
-  buyer: 'Reorders materials up to your stock targets', bookkeeper: 'Posts invoices and bills', office_assistant: 'Does the same Finance work as a Bookkeeper',
-  finance_chief: "Does the department's work", commercial_lead: "Does the department's work", supply_lead: "Does the department's work",
-  supervisor: 'Speeds up every machine', dev_engineer: 'Runs a machine set to research', chief_engineer: 'Speeds up every research project',
-  mechanic: 'Services machines', director: 'Makes every office department more productive',
+  operations_1: 'Runs one machine or works in a production cell', operations_2: 'Runs a machine with more skill than a Junior Operator', operations_3: 'Speeds up every machine',
+  maintenance_1: 'Services machines', maintenance_2: 'Services and repairs faster than a Junior Mechanic', maintenance_3: 'The best repairer on the floor',
+  engineering_1: 'Runs a machine set to research', engineering_2: 'Researches faster and better than a Junior Engineer', engineering_3: 'Speeds up every research project',
+  finance_1: 'Posts invoices and bills', finance_2: 'Posts invoices and bills faster', finance_3: "Does the department's work",
+  sales_1: 'Wins orders from stores', sales_2: 'Wins more orders than a Junior Sales Rep', sales_3: "Does the department's work",
+  promotions_1: 'Runs ads and displays', promotions_2: 'Raises brand awareness faster than a Junior Promoter', promotions_3: "Does the department's work",
+  purchasing_1: 'Reorders materials up to your stock targets', purchasing_2: 'Handles more orders a day than a Junior Buyer', purchasing_3: "Does the department's work",
+  director: 'Makes every office department more productive',
 };
 for (const [key, start] of Object.entries(duties)) ok(JOBS[key].desc.startsWith(start), `${JOBS[key].title} duties start "${start}"`);
 // the job the game suggests for each role is the one the statuses and buttons name
-ok(jobFor('operator').title === 'Machine Operator' && jobFor('researcher').title === 'Research Engineer' && jobFor('sales').title === 'Sales Rep' && jobFor('purchasing').title === 'Materials Buyer', 'the hire for each role has the new title');
+ok(jobFor('operator').title === 'Junior Operator' && jobFor('researcher').title === 'Junior Engineer' && jobFor('sales').title === 'Junior Sales Rep' && jobFor('purchasing').title === 'Junior Buyer' && jobFor('finance').title === 'Finance Clerk', 'the hire for each role is the Junior job');
 
 // no old title, department or line name is left in src/ or data/
 const OLD = ['Line Worker', 'Account Rep', 'Promotions Specialist', 'Office Assistant', 'Finance Chief', 'Commercial Lead', 'Supply Lead',
@@ -64,7 +70,7 @@ ok(EQUIP_NAME.handcart === 'Pallet jack', 'the catalog item is a Pallet jack');
 ok(ZONE_INFO[ZONE.STORAGE].name === 'Storage zone', 'the storage squares are a "Storage zone"');
 
 // ---- criterion 5: articles come from one helper
-for (const t of titles) ok(aOrAn(t) === `a ${t}`, `aOrAn("${t}") = "${aOrAn(t)}"`);
+for (const t of titles) { const want = /^[aeiou]/i.test(t) ? `an ${t}` : `a ${t}`; ok(aOrAn(t) === want, `aOrAn("${t}") = "${aOrAn(t)}"`); }   // no title starts with a word like "unit" or "hour"
 const cases = { operator: 'an operator', engineer: 'an engineer', 'Office Assistant': 'an Office Assistant', 'Account Rep': 'an Account Rep',
   'Inspection table': 'an Inspection table', unit: 'a unit', 'Union rep': 'a Union rep', user: 'a user', 'one-off': 'a one-off', hour: 'an hour', 'Head of Sales': 'a Head of Sales' };
 for (const [w, a] of Object.entries(cases)) ok(aOrAn(w) === a, `aOrAn("${w}") = "${aOrAn(w)}"`);

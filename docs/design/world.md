@@ -157,33 +157,36 @@ City size drives wages, rent and how experienced applicants are (`economy.city`)
 
 ## 5. Organisation
 
-There are six departments and 14 roles. The mechanics behind them: Machine Operators run machines, a Floor
-Supervisor lifts the crew, Plant Mechanics repair machines, Research Engineers do research, and office staff keep the
-books, buy materials and sell. Office staff need a desk.
+There are six departments, seven families of jobs and 22 jobs. Each family is a ladder of three levels, Junior,
+Senior and Director, and the Plant Director stands alone at the top. The mechanics behind them: Operators run
+machines, the Operations Director lifts the crew, Mechanics repair machines, Engineers do research, and office staff
+keep the books, buy materials, sell and promote. Office staff need a desk.
 
-Names follow one rule: a job title says what the person does, a department has the same name as its screen (Sales,
-Purchasing, Finance), and every line is called "*X* line". A production cell takes its line's process name, so the
-Die-casting line makes a "Die-casting cell". Memos about the plant itself come from "Plant log", not from a job you
-could hire.
+Names follow one rule: a job title says what the person does and how senior they are, a department has the same name
+as its screen (Sales, Purchasing, Finance), and every line is called "*X* line". A production cell takes its line's
+process name, so the Die-casting line makes a "Die-casting cell". Memos about the plant itself come from "Plant log",
+not from a job you could hire.
 
-| Department | Role | Lead? | Works in | Job |
-|---|---|---|---|---|
-| Management | Plant Director | yes | office | lifts every office department |
-| Finance | Finance Manager | yes | office | does Finance work and lifts the department |
-| Finance | Bookkeeper | | office | invoices, payments, payroll |
-| Finance | Finance Clerk | | office | the same Finance work as a Bookkeeper, for less pay |
-| Sales | Sales Manager | yes | office | does sales work and lifts the department |
-| Sales | Sales Rep | | office | wins orders from stores |
-| Sales | Marketer | | office | runs ads, raises brand awareness |
-| Purchasing | Purchasing Manager | yes | office | does buying and lifts the department |
-| Purchasing | Materials Buyer | | office | reorders materials up to the stock targets |
-| Production | Floor Supervisor | yes | floor | lifts machine output, lowers crew stress, can run a machine |
-| Production | Machine Operator | | floor | runs a machine or works in a cell, and carries its boxes |
-| Engineering | Chief Engineer | yes | office | speeds up all research |
-| Engineering | Research Engineer | | floor | runs research machines and cell technology research |
-| Engineering | Plant Mechanic | | floor | services and repairs machines |
+| Family | Department | Junior | Senior | Director | Lead? | Works in |
+|---|---|---|---|---|---|---|
+| Operations | Production | Junior Operator | Senior Operator | Operations Director | Director | floor |
+| Maintenance | Production | Junior Mechanic | Senior Mechanic | Maintenance Director | | floor |
+| Engineering | Engineering | Junior Engineer | Senior Engineer | Engineering Director | | floor (Director runs research and leads it) |
+| Finance | Finance | Finance Clerk | Bookkeeper | Finance Director | Director | office |
+| Sales | Sales | Junior Sales Rep | Senior Sales Rep | Sales Director | Director | office |
+| Promotions | Sales | Junior Promoter | Senior Promoter | Promotions Director | Director | office |
+| Purchasing | Purchasing | Junior Buyer | Senior Buyer | Purchasing Director | Director | office |
+| Management | Management | Plant Director | | | yes | office |
 
-The pay multiples (of the city average salary) run from 0.6 (Finance Clerk) to 2.3 (Plant Director).
+Pay, as multiples of the city average salary (Junior, Senior, Director): Operations 0.64, 1.0, 1.5; Maintenance 0.88,
+1.15, 1.55; Engineering 1.1, 1.45, 1.9; Finance 0.6, 1.0, 1.65; Sales 0.95, 1.3, 1.8; Promotions 0.92, 1.25, 1.75;
+Purchasing 0.82, 1.1, 1.5. The Plant Director stays at 2.3.
+
+Seniority is learned. Someone with a post (a machine, a cell, a desk or an office, or a mechanic's or foreman's work)
+earns experience each working day, a little faster when the job suits them. At 130 experience they become a Senior
+and at 560 a Director, with a memo and a rise in pay in step with the city. Skill rises 0.10 for each level and 0.08
+more across a level. Applicants arrive 70% Junior, 25% Senior and 5% Director; a Senior or Director starts at their
+level's experience. Experience is `xp`; the numbers are in `economy.seniority`.
 
 ### Traits
 

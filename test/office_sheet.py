@@ -8,7 +8,7 @@ JS = """() => {
   const S = 3, lo = document.createElement('canvas'); lo.width = 26 * T; lo.height = 15 * T;
   const c = lo.getContext('2d'); c.fillStyle = '#d3d8d2'; c.fillRect(0, 0, lo.width, lo.height);
   c.fillStyle = '#c1c8c1'; for (let x = 0; x < lo.width; x += T) c.fillRect(x, 0, 1, lo.height); for (let y = 0; y < lo.height; y += T) c.fillRect(0, y, lo.width, 1);
-  const st = { employees: [{ id: 1, job: 'account_rep', assign: 100 }, { id: 2, job: 'buyer', assign: 103 }, { id: 3, job: 'promotions', assign: 104 }] };
+  const st = { employees: [{ id: 1, job: 'sales_1', assign: 100 }, { id: 2, job: 'purchasing_1', assign: 103 }, { id: 3, job: 'promotions_1', assign: 104 }] };
   const v = { fl: { w: 26, h: 15, objects: [] }, ox: 0, oy: 12, W: lo.width, H: lo.height };
   for (let i = 0; i < 5; i++) drawObject(c, v, st, { kind: 'office', officeType: i, id: 100 + i, x: 1 + (i % 4) * 4, y: 0 + Math.floor(i / 4) * 4, rot: 0 }, {}, 0, false);
   const d = { kind: 'suite', cw: 8, ch: 6, items: [], x: 17, y: 1 }; d.hatches = suites.defaultSuiteHatches(d);

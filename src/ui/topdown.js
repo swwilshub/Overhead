@@ -747,7 +747,7 @@ export function demoScene(canvas, C, newFloor, ZONE_) {
   const v = makeView(fl, 2);
   canvas.width = v.W * 2; canvas.height = v.H * 2;
   const lo = document.createElement('canvas'); lo.width = v.W; lo.height = v.H;
-  const workers = [{ e: { id: 1, job: 'line_worker', px: 4, py: 7 }, moving: false }, { e: { id: 6, job: 'line_worker', px: 12, py: 7 }, moving: false }, { e: { id: 3, job: 'account_rep', px: 10, py: 10.4 }, moving: false }, { e: { id: 9, job: 'supervisor', px: 8, py: 7.2 }, moving: false, bubble: 'coffee' }];
+  const workers = [{ e: { id: 1, job: 'operations_1', px: 4, py: 7 }, moving: false }, { e: { id: 6, job: 'operations_1', px: 12, py: 7 }, moving: false }, { e: { id: 3, job: 'sales_1', px: 10, py: 10.4 }, moving: false }, { e: { id: 9, job: 'operations_3', px: 8, py: 7.2 }, moving: false, bubble: 'coffee' }];
   drawScene(lo.getContext('2d'), v, { floor: fl }, { C, t: 0, anim: false, pallets: 16, workers });
   const c = canvas.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(lo, 0, 0, canvas.width, canvas.height);
 }

@@ -753,7 +753,7 @@ function drawFrame() {
   c.drawImage(lo, 0, 0, canvas.width, canvas.height);
 }
 // a building crew in hard hats around whatever is being installed at the new site
-const crew = [101, 102, 103, 104].map((id, i) => ({ id, job: ['line_worker', 'mechanic', 'supervisor', 'line_worker'][i], hat: true, px: null, py: null, tx: null, ty: null }));
+const crew = [101, 102, 103, 104].map((id, i) => ({ id, job: ['operations_1', 'maintenance_1', 'operations_3', 'operations_1'][i], hat: true, px: null, py: null, tx: null, ty: null }));
 function crewSprites(st, anim) {
   const mv = st.move, n = mv.order.length, p = G.moveProgress(st);
   const i = Math.floor(Math.max(0, (p - 0.08) / 0.86) * n);

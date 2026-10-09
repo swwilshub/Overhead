@@ -200,6 +200,28 @@ dialog .dlg-actions { display: flex; flex-wrap: wrap; justify-content: flex-end;
 .cat-tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 2px solid var(--line) }
 .cat-tabs [role=tab] { border-radius: var(--radius) var(--radius) 0 0; border-bottom: 0; padding: 6px 12px; background: var(--panel-2); margin-bottom: -2px; border: 1px solid var(--line) }
 .cat-tabs [role=tab][aria-selected=true] { background: var(--panel); border-color: var(--accent); border-bottom: 2px solid var(--panel); font-weight: 700; color: var(--accent) }
+.ladder { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 }
+.ladder li { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 22px; gap: 2px; min-width: 0 }
+.ladder li::before { content: ''; position: absolute; top: 8px; left: 0; right: 0; height: 3px; background: var(--line) }
+.ladder li:first-child::before { left: 50% } .ladder li:last-child::before { right: 50% } .ladder li:only-child::before { display: none }
+.ladder .dot { position: absolute; top: 2px; width: 15px; height: 15px; border-radius: 50%; background: var(--panel); border: 3px solid var(--line); box-sizing: border-box }
+.ladder li.on .dot { background: var(--accent); border-color: var(--accent) }
+.ladder li.on::before { background: var(--accent) } .ladder li.on + li::before { background: var(--line) }
+.ladder .rung { font-weight: 700; overflow-wrap: anywhere }
+.ladder .rung-info { display: flex; flex-direction: column; font-size: 0.82rem; color: var(--muted) }
+.levelline { position: relative; height: 18px; margin: 4px 9px }
+.levelline::before, .levelline::after { content: ''; position: absolute; top: 7px; left: 0; height: 4px; border-radius: 2px }
+.levelline::before { width: 100%; background: var(--line) } .levelline::after { width: var(--p); background: var(--accent) }
+.levelline .pt { position: absolute; top: 1px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; box-sizing: border-box; background: var(--panel); border: 3px solid var(--line); z-index: 1 }
+.levelline .pt.on { background: var(--accent); border-color: var(--accent) }
+.carousel { display: grid; gap: 10px; max-width: 760px } .carousel:focus-visible { outline-offset: 2px }
+.carousel-card { touch-action: pan-y; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 14px 16px; user-select: none; -webkit-user-select: none }
+.carousel-bar { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center }
+.carousel-bar .carousel-btn { min-height: 48px; font-weight: 700; font-size: 1.05rem } .carousel-count { text-align: center; min-width: 5em; font-weight: 700 }
+.profile-card { display: grid; gap: 8px } .profile-card header h2 { margin: 0 } .profile-title { margin: 0; font-weight: 700 }
+.profile-level p { margin: 2px 0 0; font-weight: 600 } .dept-line ul { align-items: center }
+.profile-pay { margin: 0 } .profile-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 }
+.profile-stats dt { font-size: 0.8rem; color: var(--muted) } .profile-stats dd { margin: 0 }
 .cat-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start }
 .cat-preview { position: relative; margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: 'l c r' '. b .'; gap: 18px 22px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel) }
 .cat-canvas-wrap { position: relative; z-index: 1; grid-area: c }
@@ -343,6 +365,8 @@ dialog.menu-sheet .dlg { position: relative; gap: 10px; padding: 16px 16px calc(
   #inspector.sheet:not(.open) .card > :not(h2):not(.sheet-actions):not(p:first-of-type) { display: none }
   /* the floor page gives its height to the plant: the address line stays for screen readers only */
   .floor-page h1 { font-size: var(--step-2) }
+  .dept-line ul { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px !important } .dept-line ul::-webkit-scrollbar { display: none } .dept-line li { flex: none; white-space: nowrap }
+  .staff-page .view-head { flex-wrap: nowrap; align-items: center; margin-bottom: 8px } .staff-page .view-head p { font-size: 0.85rem } .staff-page .view-head button { flex: none }
   .floor-page .view-head p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
   /* toasts sit under the top bar and never hide the bottom bar or the thumbs */
   .toasts { top: calc(env(safe-area-inset-top, 0px) + 100px); bottom: auto; left: 12px; right: 12px; max-width: none }

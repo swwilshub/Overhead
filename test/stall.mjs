@@ -41,7 +41,7 @@ function machine(st, x, y, recipe = start) {
   ok(memos.length === before + 1, `one notice after 30 shift minutes (${memos.length - before})`);
   const m = memos[memos.length - 1];
   ok(m.from === 'Plant log' && m.subject === `Machine stopped: ${objectLabel(st, o)}`, `from the plant log, naming the machine: "${m.subject}"`);
-  ok(/out of/.test(m.body) && /nothing on order/.test(m.body) && /Materials Buyer/.test(m.body), `the body gives the reason and the fix: ${m.body}`);
+  ok(/out of/.test(m.body) && /nothing on order/.test(m.body) && /Junior Buyer/.test(m.body), `the body gives the reason and the fix: ${m.body}`);
   ok(m.important === true, 'urgent when no machine is running');
   for (let d = 0; d < 3; d++) G.advance(st, 1440);
   ok(stallMemos(st).length === before + 1, `no second notice while it stays stalled for three more days (${stallMemos(st).length - before})`);

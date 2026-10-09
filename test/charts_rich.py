@@ -16,7 +16,7 @@ async def main():
         await pg.click('nav.rail a[href="#catalog"]'); await pg.click('#tab-f1'); await pg.click('text=Place ($55,000)'); await pg.wait_for_timeout(200)
         box = await pg.locator('#floor-app canvas').bounding_box()
         await pg.mouse.click(box["x"] + 22*17.5, box["y"] + 22*8.5); await pg.wait_for_timeout(300); print("place:", await pg.locator("#live-polite").inner_text(), "|", await pg.locator("#live-assertive").inner_text())
-        await pg.click('nav.rail a[href="#hire"]'); await pg.click('[data-key="ad-line_worker"]')
+        await pg.click('nav.rail a[href="#hire"]'); await pg.click('[data-key="ad-operations"]')
         print("eq rows", await pg.locator("[data-key^=\"eq-\"]").count())
         for wk in range(7):
             await pg.click('nav.rail a[href="#purchasing"]'); await pg.click('text=Suggest targets'); await pg.click('text=Purchase all to target'); await pg.wait_for_timeout(150)
