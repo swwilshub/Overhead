@@ -14,6 +14,7 @@ import { unitsPerHour } from '../../sim/world.js';
 import { sfx } from '../sound.js';
 import { CELL_ITEMS, itemDef, itemTiles, itemSize, isStation, workSquare, itemProblem, analyse, standardLayout, defaultHatches, hatchSpotOk, HATCH_ROLES, REQUIRED, EXTRAS, MIN_SIZE, MAX_SIZE, METRICS, TECHS, cellPrice, techDone } from '../../sim/cells.js';
 import { itemColor } from '../topdown.js';
+import { confirmCredit } from '../credit.js';
 import { analyseSuite, standardSuite, suitePrice, defaultSuiteHatches, SUITE_REQUIRED, SUITE_EXTRAS, SUITE_MIN, SUITE_MAX } from '../../sim/suites.js';
 
 // what differs between a production cell and an office suite
@@ -229,6 +230,11 @@ export function editorPanel(st) {
 async function confirmCell(st) {
   const E = fv().cell, d = E.draft; const a = K(d).analyse(d);
   if (!a.ok) { sfx('error'); announce(a.problems[0], 'assertive'); return; }
+  // ask before borrowing for a build, or for an edit that costs more; Cancel leaves the editor as it was
+  const old = E.editingId ? st.floor.objects.find(o => o.id === E.editingId) : null;
+  const cost = old ? G.cellExtrasCost(old.family, d.items, old.kind) - G.cellExtrasCost(old.family, old.items, old.kind) : G.roomPrice(d) + G.cellExtrasCost(d.family, d.items, d.kind);
+  if (cost > 0 && !G.cellProblem(st, d, E.editingId) && !(await confirmCredit(st, cost))) return;
+  if (fv().cell !== E) return;
   if (E.editingId) { const r = G.editCell(st, E.editingId, d.items, d.hatches); act(r, false, 'place'); if (r.ok) stop(); return; }
   const r = G.buildCell(st, d);
   if (!r.ok) { act(r); return; }

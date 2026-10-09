@@ -87,6 +87,51 @@ async def main():
         await pg.add_script_tag(content=AXE)
         res = await pg.evaluate("async () => { const r = await axe.run(document, { resultTypes: ['violations'] }); return r.violations.map(v => v.id + ':' + v.nodes.length); }")
         ok(not res, f'axe on floor with belt inspector: {res}')
+        # spending guard: with no cash, laying five belt squares by keyboard asks once before borrowing
+        spot = await pg.evaluate("""() => { const {app, G} = window.__overhead, st = app.st, fl = st.floor;
+          app.speed = 0; const bank = { ...st.bank, txns: [...st.bank.txns] }, n = fl.objects.length, rev = fl.rev, nextId = fl.nextId; st.bank.checking += 1e6;
+          let found = null;
+          for (let y = 2; y < fl.h - 2 && !found; y++) for (let x = 2; x < fl.w - 7 && !found; x++) {
+            const k = fl.objects.length; let good = true;
+            for (let i = 0; i < 5 && good; i++) good = G.placeEquipment(st, { kind: 'conveyor', x: x + i, y }).ok;
+            fl.objects.length = k; if (good) found = { x, y };
+          }
+          fl.objects.length = n; fl.rev = rev + 1; fl.nextId = nextId; Object.assign(st.bank, bank);
+          st.bank.checking = 0; st.bank.savings = 0; st.bank.credit = 0;
+          return found; }""")
+        ok(spot is not None, f'found a free row for five belt squares: {spot}')
+        await pg.click('[data-key="ft-belt"]'); await pg.wait_for_timeout(200)
+        await pg.evaluate("(s) => { const v = window.__overhead.app.viewState.floor; v.cx = s.x; v.cy = s.y; }", spot)
+        belts0 = await pg.evaluate("() => window.__overhead.app.st.floor.objects.filter(o => o.kind === 'conveyor').length")
+        await pg.focus('#floor-app'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(300)
+        dlg = pg.locator('dialog[open]')
+        txt = ' '.join(((await dlg.text_content()) or '').split()) if await dlg.count() else ''
+        ok('Buy on credit?' in txt and 'would come from the credit line' in txt and 'a year' in txt, 'first belt square asks before borrowing: ' + txt[:200])
+        ok(await pg.locator('dialog[open] strong:has-text("would come from the credit line")').count() == 1, 'the borrowed amount is in bold words')
+        ok(await pg.evaluate("() => document.activeElement?.textContent") == 'Cancel', 'Cancel has focus first')
+        await pg.add_script_tag(content=AXE)
+        res = await pg.evaluate("async () => { const r = await axe.run(document, { resultTypes: ['violations'] }); return r.violations.map(v => v.id + ':' + v.nodes.length); }")
+        ok(not res, f'axe with the credit dialog open: {res}')
+        await pg.keyboard.press('Tab'); focused = await pg.evaluate("() => document.activeElement?.textContent")
+        ok(focused.startswith('Buy and borrow $'), 'Tab reaches the buy button, which names the amount: ' + focused)
+        await pg.keyboard.press('Enter'); await pg.wait_for_timeout(300)
+        dialogs = 1
+        await pg.focus('#floor-app')
+        for _ in range(4):
+            await pg.keyboard.press('ArrowRight'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(150)
+            if await pg.locator('dialog[open]').count(): dialogs += 1; await pg.keyboard.press('Escape'); await pg.focus('#floor-app')
+        info = await pg.evaluate("() => { const st = window.__overhead.app.st; return { belts: st.floor.objects.filter(o => o.kind === 'conveyor').length, credit: st.bank.credit }; }")
+        ok(dialogs == 1 and info['belts'] - belts0 == 5 and info['credit'] > 0, f'five belt squares laid on credit with one dialog ({dialogs} dialogs, {info["belts"] - belts0} squares, credit {info["credit"]:.0f})')
+        # Escape ends the session: the next square asks again, and Cancel buys nothing
+        await pg.keyboard.press('Escape'); await pg.click('[data-key="ft-belt"]'); await pg.wait_for_timeout(200)
+        await pg.evaluate("(s) => { const v = window.__overhead.app.viewState.floor; v.cx = s.x; v.cy = s.y + 1; }", spot)
+        credit0 = await pg.evaluate("() => window.__overhead.app.st.bank.credit")
+        await pg.focus('#floor-app'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(300)
+        ok(await pg.locator('dialog[open]:has-text("Buy on credit?")').count() == 1, 'a new belt session asks again')
+        await pg.click('dialog[open] button:has-text("Cancel")'); await pg.wait_for_timeout(200)
+        after = await pg.evaluate("() => { const {app} = window.__overhead, st = app.st; return { belts: st.floor.objects.filter(o => o.kind === 'conveyor').length, credit: st.bank.credit, mode: app.viewState.floor.mode }; }")
+        ok(after['belts'] - belts0 == 5 and after['credit'] == credit0 and after['mode'] == 'place', f'Cancel buys nothing and keeps the belt tool: {after}')
+        await pg.keyboard.press('Escape')
         ok(not errs, f'no page errors {errs[:2]}')
         await b.close()
     print(f'{fails} FAILED' if fails else 'all belt UI checks pass')

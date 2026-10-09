@@ -34,6 +34,9 @@ Player-facing changes, newest first.
   memo text.
 - Keyboard and screen reader: Space, `[`, `]`, `?` and `g` plus a letter now work on the factory floor too, focus
   stays where you were after pressing a button, and repeated buttons say which row they act on ("Details, Akron, OH").
+- Buying something you can't cover from checking and savings now asks first ("Buy on credit?") and says how much
+  would come from the credit line. Late-payment fees on the bank statement say how late the bill was paid, and a memo
+  explains why suppliers charged them.
 - Movers on the construction site now wear the right department colours.
 - Loading a save made by a newer version of the game now says so, instead of failing quietly.
 - Stray code text is gone: the side panel no longer shows "[object HTMLElement]" after you click an empty square, and

@@ -11,6 +11,7 @@ import { money, num, pct, minuteOfDay, fmtShortDate, fmtDate } from '../../core/
 import { buyDialog } from './business.js';
 import { sfx } from '../sound.js';
 import { makeView, screenToTile, drawScene, tileXY, itemColor, T as TILE } from '../topdown.js';
+import { confirmCredit, creditToAsk, creditWords } from '../credit.js';
 import { editing, editorPrimary, editorKey, editorPanel, editorDraw, speakCell, cancelEditor, startEditCell, cellMetrics, suiteMetrics } from './cellEditor.js';
 import { analyseSuite } from '../../sim/suites.js';
 import { workSquare, isStation, itemDef, METRICS } from '../../sim/cells.js';
@@ -161,11 +162,10 @@ function primary(st, v, drag = false) {
     app.dirty = true; return;
   }
   if (v.mode === 'place') {
-    const g = ghostSpec(v); const r = G.placeEquipment(st, g);
-    if (!r.ok) { if (!drag) act(r); return; }
-    sfx(r.obj.kind === 'conveyor' ? 'belt' : 'place'); announce(`${objectLabel(st, r.obj)} placed for ${money(priceOf(r.obj))}.`);
-    if (r.linked?.length) { sfx('ok'); announce(r.linked.map(l => l.text).join(' '), 'polite'); }
-    if (!v.placing.repeat) { v.mode = 'select'; v.placing = null; v.sel = r.obj.id; rerender({}); document.getElementById('floor-app')?.focus(); }
+    const g = ghostSpec(v);
+    // borrowing needs a yes first; once given, the rest of this placing session (one belt run) doesn't ask again
+    if (v.creditFor !== v.placing && !placementProblem(st.floor, g) && creditToAsk(st, priceOf(g))) { askCredit(st, v, g); return; }
+    placeGhost(st, v, g, drag);
     return;
   }
   if (v.mode === 'move') {
@@ -177,6 +177,25 @@ function primary(st, v, drag = false) {
   v.sel = o ? o.id : null;
   if (o) announce(`Selected ${objectLabel(st, o)}. Press I for details, M to move, Delete to sell.`, 'polite', false);
   updateInspector();
+}
+function placeGhost(st, v, g, drag) {
+  const r = G.placeEquipment(st, g);
+  if (!r.ok) { if (!drag) act(r); return; }
+  sfx(r.obj.kind === 'conveyor' ? 'belt' : 'place'); announce(`${objectLabel(st, r.obj)} placed for ${money(priceOf(r.obj))}.`);
+  if (r.linked?.length) { sfx('ok'); announce(r.linked.map(l => l.text).join(' '), 'polite'); }
+  if (!v.placing.repeat) { v.mode = 'select'; v.placing = null; v.sel = r.obj.id; rerender({}); document.getElementById('floor-app')?.focus(); }
+}
+let asking = false;
+async function askCredit(st, v, g) {
+  if (asking) return;
+  asking = true; dragging = false;
+  const spec = v.placing;
+  try {
+    if (!(await confirmCredit(st, priceOf(g)))) return;
+    if (v.mode !== 'place' || v.placing !== spec) return;
+    v.creditFor = spec;
+    placeGhost(st, v, g, false);
+  } finally { asking = false; }
 }
 function cancel(v) {
   if (v.mode === 'cell') { editorKey({ key: 'Escape', preventDefault() {} }, app.st); return; }
@@ -401,7 +420,9 @@ async function layBelt(st, from, to, k) {
   const dry = G.connectByBelt(st, from, to, true, k);
   if (!dry.ok) { act(dry); return; }
   const port = dry.k != null ? `input ${dry.k + 1} of ` : '';
-  if (dry.tiles && !(await confirmBox('Lay this belt?', `${dry.tiles} conveyor sections from ${nameOf(st, from)} to ${port}${nameOf(st, to)}, for ${money(dry.price)}.`, `Lay belt (${money(dry.price)})`))) return;
+  const need = dry.tiles ? creditToAsk(st, dry.price) : 0;
+  const text = `${dry.tiles} conveyor sections from ${nameOf(st, from)} to ${port}${nameOf(st, to)}, for ${money(dry.price)}.`;
+  if (dry.tiles && !(await confirmBox('Lay this belt?', need ? [text, ' ', ...creditWords(st, dry.price)] : text, need ? `Lay belt and borrow ${money(need)}` : `Lay belt (${money(dry.price)})`, !!need))) return;
   const res = G.connectByBelt(st, from, to, false, k);
   if (res.ok) { sfx('belt'); act({ ok: true, msg: res.linked?.length ? res.linked.map(l => l.text).join(' ') : (res.msg || `Laid ${res.tiles} sections.`) }, false, 'ok'); }
   else act(res);

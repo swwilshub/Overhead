@@ -119,6 +119,8 @@ function coverOverdraft(st) {
   }
 }
 export function creditLimit(st) { return Math.max(75000, Math.round(0.5 * (equipmentValue(st) + inventoryValue(st) + arTotal(st)))); }
+// How much of a price paid on the spot would come from the credit line: 0 when checking plus savings cover it.
+export function creditNeeded(st, price) { return Math.max(0, Math.round(price - st.bank.checking - st.bank.savings)); }
 
 // ---------------- memos
 export function memo(st, m) {
@@ -927,14 +929,17 @@ function startOfDay(st) {
   for (const m of st.memos) if (m.kind === 'resume' && !m.data.hired && !m.data.gone && m.data.expires < st.time) m.data.gone = true;
   // accounts receivable and payable that fall due today
   const delay = accountingDelay(st);
+  let lateFees = 0;
+  const feeBefore = lateFeeThisMonth(st);
   for (const a of [...st.ar]) if (a.due + delay * MIN_PER_DAY <= st.time) { st.ar.splice(st.ar.indexOf(a), 1); receive(st, a.amount, 'sales', `Payment received: ${a.desc}`); st.dept.txToday = (st.dept.txToday || 0) + 1; }
   for (const b of [...st.ap]) if (b.due <= st.time) {
     st.ap.splice(st.ap.indexOf(b), 1);
     let amt = b.amount;
-    if (delay > 3) { const fee = Math.round(amt * 0.015 * Math.ceil(delay / 7)); pay(st, fee, 'fines', `Late-payment fee: ${b.desc}`); }
+    if (delay > 3) { const fee = Math.round(amt * 0.015 * Math.ceil(delay / 7)); pay(st, fee, 'fines', `${LATE_FEE}, paid ${plural(delay, 'day')} late: ${b.desc}`); lateFees += fee; }
     pay(st, amt, 'purchases', `Paid invoice: ${b.desc}`);
     st.dept.txToday = (st.dept.txToday || 0) + 1;
   }
+  if (lateFees > 0 && !feeBefore) lateFeeMemo(st, lateFees, delay);
   autoPurchase(st);
   // outside repair service for broken machines when we have no maintenance staff
   if (!st.employees.some(e => hasRole(e, 'maintenance') && !e.state)) for (const o of st.floor.objects) if (isProducer(o) && o.broken) {
@@ -958,6 +963,16 @@ function autoPurchase(st) {
   }
 }
 
+// The first late fee in a game month gets a memo saying why. Read from this month's statement lines, so nothing new is saved.
+const LATE_FEE = 'Late-payment fee';
+function lateFeeThisMonth(st) { const m = monthKey(st.time); return st.bank.txns.some(t => t.kind === 'fines' && t.desc.startsWith(LATE_FEE) && monthKey(t.t) === m); }
+function lateFeeMemo(st, fees, delay) {
+  const fin = titleFor('finance'), a = /^[AEIOU]/i.test(fin) ? 'An' : 'A';
+  const why = has(st, 'finance')
+    ? `Finance is behind on the books, so bills go out late. One more ${fin} would catch up and pay them on time.`
+    : `Bills go out late when nobody keeps the books. ${a} ${fin} would pay them on time, and customers would pay you sooner too.`;
+  memo(st, { from: 'Plant log', subject: 'Suppliers charged late fees', body: `Suppliers added ${money(fees)} in late fees because bills were paid ${plural(delay, 'day')} late. ${why}` });
+}
 export function accountingDelay(st) {
   const staff = st.employees.filter(e => hasRole(e, 'finance'));
   if (!staff.length) return 6;
