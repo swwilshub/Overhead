@@ -1,0 +1,434 @@
+{
+ "01-title": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 3,
+  "smallEx": [
+   "Quick start 96x34",
+   "Set up a new company 168x34",
+   "Found the company 149x34"
+  ],
+  "wideEx": [],
+  "dlgInfo": null
+ },
+ "02-new-company": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 3,
+  "smallEx": [
+   "Quick start 96x34",
+   "Set up a new company 168x34",
+   "Found the company 149x34"
+  ],
+  "wideEx": [],
+  "dlgInfo": null
+ },
+ "03-floor": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 13,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "nav": {
+  "w": 390,
+  "h": 49,
+  "display": "block",
+  "pos": "static",
+  "links": 13
+ },
+ "10-catalog": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 23,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "10-hire": {
+  "vw": 492,
+  "vh": 1063,
+  "scrollW": 492,
+  "hscroll": false,
+  "smallTargets": 6,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=559",
+   "A. right=559",
+   "SPAN.badge right=549",
+   "LI. right=666"
+  ],
+  "dlgInfo": null
+ },
+ "10-staff": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 15,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "10-inbox": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 14,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "10-purchasing": {
+  "vw": 500,
+  "vh": 1080,
+  "scrollW": 500,
+  "hscroll": false,
+  "smallTargets": 15,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=559",
+   "A. right=559",
+   "SPAN.badge right=549",
+   "LI. right=666"
+  ],
+  "dlgInfo": null
+ },
+ "10-sales": {
+  "vw": 790,
+  "vh": 1710,
+  "scrollW": 790,
+  "hscroll": false,
+  "smallTargets": 7,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=793",
+   "A. right=793",
+   "LI. right=876",
+   "A. right=876"
+  ],
+  "dlgInfo": null
+ },
+ "10-bank": {
+  "vw": 391,
+  "vh": 847,
+  "scrollW": 391,
+  "hscroll": false,
+  "smallTargets": 9,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "10-reports": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 15,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "10-research": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 20,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "10-city": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 7,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "10-nation": {
+  "vw": 461,
+  "vh": 998,
+  "scrollW": 461,
+  "hscroll": false,
+  "smallTargets": 92,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=559",
+   "A. right=559",
+   "SPAN.badge right=549",
+   "LI. right=666"
+  ],
+  "dlgInfo": null
+ },
+ "10-options": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 32,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "20-catalog-from-floor": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 23,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "21-run-until-dialog": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 18,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": {
+   "w": 352,
+   "h": 263,
+   "top": 290,
+   "bottom": 554,
+   "fits": true
+  }
+ },
+ "22-floor-selected": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 17,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": null
+ },
+ "23-sell-dialog": {
+  "vw": 390,
+  "vh": 844,
+  "scrollW": 390,
+  "hscroll": false,
+  "smallTargets": 19,
+  "smallEx": [
+   "Pause 63x34",
+   "Play 52x34",
+   "Fast 52x34",
+   "Faster 64x34",
+   "Run until\u2026 93x34",
+   "\u266a Sound 75x34"
+  ],
+  "wideEx": [
+   "LI. right=438",
+   "A. right=438",
+   "LI. right=559",
+   "A. right=559"
+  ],
+  "dlgInfo": {
+   "w": 352,
+   "h": 203,
+   "top": 321,
+   "bottom": 523,
+   "fits": true
+  }
+ },
+ "canvas": {
+  "frameW": 358,
+  "frameH": 591,
+  "canvasW": 824,
+  "canvasH": 684,
+  "scrollW": 824,
+  "scrollH": 684,
+  "touchAction": "none",
+  "pix": 2
+ },
+ "errors": []
+}

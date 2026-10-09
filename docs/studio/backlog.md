@@ -15,6 +15,21 @@ triage. Status is one of: new, specced, in progress, review, done, dropped.
 
 Left for later sprints (from this playtest): the lease screen's legend and default building size (P1-5), one-key tool switching on the floor (P2-3), belt drawing and direction by keyboard (P2-4), dropped or repeated live-region messages (P3-4), landmark names (P3-5), belt wording in the inspector (P4-2), Quick start ignoring the scenario number (P4-4), the scripted late game stalling (P4-5).
 
+## Sprint 2 (triaged 2026-10-09 from `playtests/sprint-2.md`)
+
+Sam's request: make the game work on a phone: menus, pop-ups and a pinch-to-zoom floor. This is backlog item 10, split
+into four specs (one large, three medium).
+
+| Spec | Item | Impact | Effort | Pillars | Status | Evidence |
+|---|---|---|---|---|---|---|
+| 006 | **Touch controls for the floor:** drag to pan, pinch to zoom, tap to select, and a confirm bar before anything is placed. | 5 | L | 1, 4 | specced | Sam; M-1, M-2, M-9 |
+| 007 | **Phone shell:** a slim top bar, a bottom bar and a menu sheet in place of the sideways strip of links. | 5 | M | 1, 4 | specced | Sam; M-4, M-5, M-12 |
+| 008 | **Pop-ups and panels as bottom sheets:** dialogs at the thumb, the selected machine's panel on screen, toasts clear of the action. | 4 | M | 1, 4 | specced | Sam; M-3, M-8, M-10 |
+| 009 | **Pages that fit a phone:** tables as cards with a sort menu, the Nation page, 44 px targets, one row of Catalog tabs. | 4 | M | 1, 4 | specced | Sam; M-6, M-7, M-9, M-11 |
+
+Left for later: the cell designer on a phone, tablet-specific layouts, swipe between sections, and everything left over
+from sprint 1.
+
 ## Full backlog
 
 | # | Item | Impact | Effort | Pillars | Status | Notes |
@@ -29,7 +44,7 @@ Left for later sprints (from this playtest): the lease screen's legend and defau
 | 7 | **Modding:** load a custom `world.json` from a file, with validation errors written in plain words. | 2 | M | — | new | Reuse the checks in `tools/gen_world.mjs`. |
 | 8 | **Comfort settings:** text size, reduced motion, a high-contrast palette and a colour-blind-safe machine palette. | 3 | S | 4, 5 | new | Text size, reduced motion and high contrast exist already; the gap is the machine palette. |
 | 9 | **Sound:** a mixer (effects, ambience, alerts) and an optional factory ambience that rises and falls with throughput. | 2 | S | 5 | new | |
-| 10 | **Touch and small screens:** tap to place and pinch to zoom, with the floor playable at 768 px wide. | 3 | M | 4 | new | |
+| 10 | → specs 006 to 009. **Touch and small screens:** tap to place and pinch to zoom, with the floor playable at 768 px wide. | 3 | M | 4 | new | |
 | 11 | **Render headroom (raised in sprint 1):** the floor frame on the largest building with 40 machines averages 13.4 ms, against a 16 ms budget (p95 17.5 ms, headless Chromium). Cache static layers per machine, or skip redrawing idle machines. | 3 | M | 1, 5 | new | Found while setting up `test/perf_ui_test.py`. |
 | 12 | **Cell editor loses focus:** pressing Enter on "Standard layout" sends focus to the page body, because the panel is redrawn under the button. | 3 | S | 4 | new | QA on 002 (finding 3). Happens before 002. Check again once 004 has merged, since it adds focus keeping. |
 | 13 | **Deselecting with Enter is silent:** Enter on an empty square clears the selection but only reads the square. Escape says "Selection cleared." | 2 | S | 4 | new | QA on 002 (finding 4). `primary()` in `floor.js`. |
