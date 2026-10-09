@@ -2,7 +2,7 @@
 // integer scanline fills and Bresenham lines, then scaled up without smoothing.
 import { ITEMS, RECIPES, FAMILIES, FAMILY_ID } from '../gen/data.js';
 import { JOBS, deptColor } from '../core/content.js';
-import { ZONE, footprint, ports, rotSize, links, officeKit } from '../sim/floor.js';
+import { ZONE, footprint, ports, rotSize, links, officeKit, statusMark } from '../sim/floor.js';
 
 export const HW = 10, HH = 5, WALL = 28, MARGIN = 14;
 
@@ -315,7 +315,7 @@ export function drawScene(c, v, st, opts) {
     }
     const s = o.status || '';
     let bc = null, glyph = null;
-    if (o.broken) { bc = '#d9342b'; glyph = 'x'; } else if (/empty|full/i.test(s)) { bc = '#f2b71f'; glyph = '!'; } else if (/No operator|needs/i.test(s)) { bc = '#f2b71f'; glyph = '?'; }
+    if (o.broken) { bc = '#d9342b'; glyph = 'x'; } else if (statusMark(s)) { bc = '#f2b71f'; glyph = statusMark(s); }
     if (bc) badge(c, tx + 14, ty - 2, bc, glyph);
   }
   // selection marker: a bobbing arrow above the selected item

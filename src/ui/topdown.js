@@ -3,7 +3,7 @@
 // Drawn into a low-resolution buffer with integer rectangles, then scaled without smoothing.
 import { JOBS, deptColor } from '../core/content.js';
 import { FAMILIES, FAMILY_ID } from '../gen/data.js';
-import { ZONE, footprint, ports, rotSize, objSize, inputPorts, portItem, machineTier, officeKit } from '../sim/floor.js';
+import { ZONE, footprint, ports, rotSize, objSize, inputPorts, portItem, machineTier, officeKit, statusMark } from '../sim/floor.js';
 import { itemDef, itemTiles, itemSize, workSquare, isStation, hatchInner } from '../sim/cells.js';
 import { shade, pixText, lineHue } from './iso.js';
 
@@ -432,7 +432,7 @@ function worker(c, v, e, t, moving) {
   R(c, x + 1, y - 14, 4, 4, ['#f0d2b6', '#d9a77e', '#a86e4a', '#7a4a2e'][e.id % 4]);
   R(c, x + 1, y - 15, 4, 2, ['#3a2a1a', '#1a1a1a', '#8a6a3a', '#b0b0b0', '#6a2a1a'][(e.id >> 2) % 5]);
   if (e.hat) { R(c, x, y - 16, 6, 2, '#f2b71f'); R(c, x - 1, y - 14, 8, 1, '#c99510'); }
-  // carrying boxes: in the arms, on a hand cart or on a forklift's forks
+  // carrying boxes: in the arms, on a pallet jack or on a forklift's forks
   if (e.carry?.length) {
     const box = (bx, by, col) => { const b = block(c, bx, by, 6, 4, 3, '#c89a62', { top: '#dcb27a', front: '#a77d4a', line: '#5a4026' }); R(c, b.x + 1, b.y + 1, b.w - 2, 1, col); };
     if (e.equip === 'forklift') { block(c, x - 3, y - 6, 12, 7, 4, '#f2b71f'); R(c, x + 9, y - 10, 1, 9, '#3a3a3a'); e.carry.slice(0, 4).forEach((col, k) => box(x + 10, y - 4 - k * 4, col)); }
@@ -706,7 +706,7 @@ export function drawScene(c, v, st, opts) {
       g.forEach((gg, i) => { R(c, x0, y0 + i * 3, bw, 2, '#3a3f44'); R(c, x0, y0 + i * 3, Math.max(gg.status === 'bad' ? 0 : 1, Math.round(bw * gg.frac)), 2, gg.status === 'bad' ? '#ff4a3d' : gg.status === 'warn' ? '#f2b71f' : '#5cd68a'); });
     }
     const s = o.status || ''; let bc = null, gl = null;
-    if (o.broken) { bc = '#d9342b'; gl = 'x'; } else if (/empty|full/i.test(s)) { bc = '#f2b71f'; gl = '!'; } else if (/No operator|needs/i.test(s)) { bc = '#f2b71f'; gl = '?'; }
+    if (o.broken) { bc = '#d9342b'; gl = 'x'; } else if (statusMark(s)) { bc = '#f2b71f'; gl = statusMark(s); }
     if (bc) badge(c, cx + 17, top - 6, bc, gl);
   }
   // selection marker
@@ -736,7 +736,7 @@ export function drawScene(c, v, st, opts) {
 export function demoScene(canvas, C, newFloor, ZONE_) {
   const fl = newFloor(16000); let id = 100;
   const add = o => fl.objects.push({ id: id++, rot: 0, ...o });
-  // a machine shop feeding a lighting line by belt
+  // a machining line feeding a lighting line by belt
   add({ kind: 'machine', family: FAMILY_ID.machining, x: 2, y: 4, status: 'Running', mode: 'produce' });
   add({ kind: 'machine', family: FAMILY_ID.lighting, x: 10, y: 4, status: 'Running', mode: 'produce' });
   for (const [x, y] of [[7, 5], [8, 5], [8, 4], [9, 4]]) add({ kind: 'conveyor', x, y });

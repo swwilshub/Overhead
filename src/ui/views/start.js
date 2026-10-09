@@ -3,11 +3,11 @@ import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
 import { CITIES, ECONOMY, FAMILIES, ITEM_ID, ITEMS, RECIPES } from '../../gen/data.js';
 import { lineOutlook } from '../../sim/world.js';
-import { jobFor } from '../../core/content.js';
+import { jobFor, aOrAn } from '../../core/content.js';
 import { money, fmtDate } from '../../core/util.js';
 import { listSaves, loadGame, deleteSave, topScores } from '../storage.js';
 import { makeCandidate } from '../../sim/people.js';
-import { ports, inputPorts, ZONE, newFloor } from '../../sim/floor.js';
+import { ports, inputPorts, ZONE, newFloor, objectLabel } from '../../sim/floor.js';
 import { demoScene } from '../topdown.js';
 import { sfx } from '../sound.js';
 
@@ -112,7 +112,7 @@ function quickStart() {
   for (const job of crew) { const c = makeCandidate(st, job.key); const memo = G.memo(st, { from: `${c.first} ${c.last}`, subject: 'Resume', kind: 'resume', data: { cand: c, expires: st.time + 1e7 } }); memo.read = true; G.makeOffer(st, memo.id, c.ask); }
   G.purchaseAll(st);
   st.memos.forEach(x => { if (x.kind === 'resume') x.read = true; });
-  G.memo(st, { from: 'Plant manager', subject: 'Quick start: ready to roll', important: false, body: `A ${FAMILIES[pick.family].name.toLowerCase()} making ${ITEMS[pick.out].name}, the best opening for a first machine in ${st.city.name}, is set up with safety zones, a ${crew[0].title} is on it, an ${crew[1].title} has an office, and the first materials are on order. Press Play (or the space bar) to start the clock. Good next hires: a ${jobFor('finance').title} and a ${jobFor('maintenance').title}. Then add a product line that uses what this machine makes.` });
+  G.memo(st, { from: 'Plant log', subject: 'Quick start: ready to roll', important: false, body: `${objectLabel(st, m)} making ${ITEMS[pick.out].name}, the best opening for a first machine in ${st.city.name}, is set up with safety zones, ${aOrAn(crew[0].title)} is on it, ${aOrAn(crew[1].title)} has an office, and the first materials are on order. Press Play (or the space bar) to start the clock. Good next hires: ${aOrAn(jobFor('finance').title)} and ${aOrAn(jobFor('maintenance').title)}. Then add a product line that uses what this machine makes.` });
   st.flags.pauseRequest = false; G.bus.queue.length = 0;
   app.st = st; app.speed = 0;
   sfx('place'); announce(`Quick start: ${st.setup.company} in ${st.city.name}. Press Play to start the clock.`);

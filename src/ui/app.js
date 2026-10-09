@@ -4,7 +4,7 @@ import * as G from '../sim/game.js';
 import { fmtDate, fmtTime, money, moneyShort, minuteOfDay, isWorkday, MIN_PER_DAY, monthKey, weekday } from '../core/util.js';
 import { WORK_START, WORK_END, isWhite } from '../sim/people.js';
 import { hasRole } from '../core/content.js';
-import { ports, links, ZONE } from '../sim/floor.js';
+import { ports, links, ZONE, objectLabel } from '../sim/floor.js';
 import { saveGame, localPrefsGet, localPrefsSet, submitScore } from './storage.js';
 import { sfx, sfxBatch, ambience } from './sound.js';
 
@@ -160,7 +160,7 @@ export function setupProblems(st) {
   for (const o of machines) {
     if (o.mode !== 'produce') continue;
     const un = G.unsafeInputs(fl, o);
-    if (un.length) { out.push({ text: `Machine #${o.id} needs a safety zone (or a belt) at input ${un.map(u => u.k + 1).join(' and ')}.`, view: 'floor', obj: o.id }); }
+    if (un.length) { out.push({ text: `${objectLabel(st, o)} needs a safety zone (or a belt) at input ${un.map(u => u.k + 1).join(' and ')}.`, view: 'floor', obj: o.id }); }
   }
   if (links(fl).dangling) out.push({ text: 'Some conveyor belts do not connect to anything.', view: 'floor' });
   if (st.employees.some(e => isWhite(e) && !fl.objects.some(o => (o.kind === 'office' || o.kind === 'suite') && o.id === e.assign))) out.push({ text: 'An office worker has no office.', view: 'catalog' });

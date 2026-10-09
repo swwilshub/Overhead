@@ -7,7 +7,8 @@ import { h, frag, announce, describe, confirmBox, pill } from '../dom.js';
 import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
-import { inBounds, objectAt, placementProblem } from '../../sim/floor.js';
+import { inBounds, objectAt, placementProblem, objectLabel, cellName } from '../../sim/floor.js';
+import { aOrAn } from '../../core/content.js';
 import { money, num } from '../../core/util.js';
 import { unitsPerHour } from '../../sim/world.js';
 import { sfx } from '../sound.js';
@@ -23,7 +24,7 @@ function K(d) {
     stepNames: ['Size', 'Door', 'Furnish'], perSquare: 90,
   };
   return {
-    suite: false, title: `${FAMILIES[d.family].name} cell`, noun: 'cell', min: MIN_SIZE, max: MAX_SIZE, roles: HATCH_ROLES(d.family),
+    suite: false, title: cellName(d.family), noun: 'cell', min: MIN_SIZE, max: MAX_SIZE, roles: HATCH_ROLES(d.family),
     required: REQUIRED(d.family), extras: EXTRAS(d.family), analyse: (x, o) => analyse(x, o), standard: x => standardLayout(x), price: (w, hh) => cellPrice(d.family, w, hh), hatches: x => defaultHatches(x),
     stepNames: ['Size', 'Hatches', 'Furnish'], perSquare: 120,
   };
@@ -46,13 +47,13 @@ export function startCell(family, recipe = null) {
   v.cell = { stage: 'size', corner: null, draft: { kind: 'cell', family, recipe, x: 0, y: 0, cw: 0, ch: 0, hatches: [], items: [] }, editingId: null, role: 0, tool: null };
   go('floor');
   setTimeout(() => document.getElementById('floor-app')?.focus(), 50);
-  announce(`Building a ${FAMILIES[family].name} cell. Step 1 of 3: move to one corner of the room and press Enter, then to the opposite corner and press Enter. At least ${MIN_SIZE[0]} by ${MIN_SIZE[1]} squares.`, 'polite', false);
+  announce(`Building a new ${cellName(family)}. Step 1 of 3: move to one corner of the room and press Enter, then to the opposite corner and press Enter. At least ${MIN_SIZE[0]} by ${MIN_SIZE[1]} squares.`, 'polite', false);
 }
 export function startEditCell(o) {
   const v = fv(); v.mode = 'cell'; v.sel = null;
   v.cell = { stage: 'furnish', draft: { kind: o.kind, family: o.family, recipe: o.recipe, x: o.x, y: o.y, cw: o.cw, ch: o.ch, hatches: o.hatches.map(x => ({ ...x })), items: o.items.map(x => ({ ...x })) }, editingId: o.id, role: 0, tool: null };
   rerender({}); setTimeout(() => document.getElementById('floor-app')?.focus(), 30);
-  announce(`Editing ${o.kind === 'suite' ? 'office suite' : 'cell'} #${o.id}. Pick an item from the panel to add it, or move to an item and press Enter to pick it up. Delete removes it.`, 'polite', false);
+  announce(`Editing ${objectLabel(app.st, o)}. Pick an item from the panel to add it, or move to an item and press Enter to pick it up. Delete removes it.`, 'polite', false);
 }
 function stop(msg) { const v = fv(); v.mode = 'select'; const id = v.cell?.editingId; v.cell = null; if (id) v.sel = id; if (msg) announce(msg, 'polite', false); rerender({}); document.getElementById('floor-app')?.focus(); }
 
@@ -197,7 +198,7 @@ export function editorPanel(st) {
   const a = k.analyse(d, { operators: 1 });
   const counts = {}; for (const it of d.items) counts[it.t] = (counts[it.t] || 0) + 1;
   const req = k.required;
-  const pickTool = (t, repeat = false) => { E.tool = { t, repeat }; E.picked = null; v.rot = 0; refreshPanel(); document.getElementById('floor-app')?.focus(); announce(`Placing a ${itemDef(t).name.toLowerCase()}. ${itemDef(t).desc} Move into the room, R rotates, Enter places, Escape stops.`, 'polite', false); };
+  const pickTool = (t, repeat = false) => { E.tool = { t, repeat }; E.picked = null; v.rot = 0; refreshPanel(); document.getElementById('floor-app')?.focus(); announce(`Placing ${aOrAn(itemDef(t).name.toLowerCase())}. ${itemDef(t).desc} Move into the room, R rotates, Enter places, Escape stops.`, 'polite', false); };
   const itemRow = (t, kind) => {
     const def = itemDef(t), have = counts[t] || 0, need = req.find(r => r.t === t)?.n || 0, locked = def.tech && !techDone(st, def.tech);
     const price = kind === 'req' && have < need ? 'Included' : money(def.price);
@@ -231,7 +232,7 @@ async function confirmCell(st) {
   if (E.editingId) { const r = G.editCell(st, E.editingId, d.items, d.hatches); act(r, false, 'place'); if (r.ok) stop(); return; }
   const r = G.buildCell(st, d);
   if (!r.ok) { act(r); return; }
-  sfx('fanfare'); const id = r.obj.id; stop(K(d).suite ? `Office suite #${id} built for ${money(r.price)}. Give each desk an office worker in the panel.` : `${FAMILIES[d.family].name} cell #${id} built for ${money(r.price)}. Assign operators to it in the panel.`); fv().sel = id; rerender({});
+  sfx('fanfare'); const id = r.obj.id; stop(K(d).suite ? `${objectLabel(st, r.obj)} built for ${money(r.price)}. Give each desk an office worker in the panel.` : `${objectLabel(st, r.obj)} built for ${money(r.price)}. Assign operators to it in the panel.`); fv().sel = id; rerender({});
 }
 
 // metrics block, shared with the inspector of a built cell

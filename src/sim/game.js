@@ -1,6 +1,6 @@
 // Core game state and the simulation clock.
 import { ITEMS, RECIPES, FAMILIES, CITIES, ECONOMY, SCENARIOS as SCENARIO_LIST, EVENTS } from '../gen/data.js';
-import { JOBS, DEPTS, ATTRS, hasRole, canRunMachine, jobFor } from '../core/content.js';
+import { JOBS, DEPTS, ATTRS, hasRole, canRunMachine, jobFor, aOrAn } from '../core/content.js';
 const A = (e, k) => e.attrs[ATTRS.indexOf(k)];
 import { rand, randInt, pick, chance, clamp, hashSeed, dayIndex, minuteOfDay, isWorkday, weekday, monthKey, dateOf, money, num, plural, fmtShortDate, MIN_PER_DAY } from '../core/util.js';
 import { generateCity, recomputeMarket, vendorsFor, unitsPerHour, WORKDAYS_PER_MONTH, DIFF, bestMarkets } from './world.js';
@@ -16,6 +16,8 @@ export const DEFAULT_SCENARIO = SCENARIO_LIST[0].key;
 const BANK = ECONOMY.bank.name;
 const has = (st, role) => st.employees.some(e => hasRole(e, role));
 const titleFor = role => jobFor(role).title;
+// the title with its article, "a Machine Operator"; capital for the start of a sentence
+const aTitle = (role, capital = false) => aOrAn(titleFor(role), capital);
 
 // Announcements for the screen-reader live region and toasts (transient, not saved).
 export const bus = { queue: [], sounds: [], push(msg, level = 'polite') { this.queue.push({ msg, level }); }, sound(name) { this.sounds.push(name); if (this.sounds.length > 50) this.sounds.shift(); } };
@@ -61,7 +63,7 @@ export function rentBuilding(st, lotId) {
   st.floor = newFloor(lot.sqft);
   st.rent = lot.rent;
   memo(st, { from: 'Leasing office', subject: `Lease signed: ${lot.addr}`, body: `Your lease on ${lot.addr} in ${st.city.name} starts today: ${num(lot.sqft)} sq ft at ${money(lot.rent)} a month, due on the first of each month.` });
-  memo(st, { from: 'Plant manager', subject: 'Getting started', important: true, body: `The building is bare. From the Catalog, buy a machine and set it down, paint a safety zone on each input square, and hire a ${titleFor('operator')}. Nothing runs until materials arrive, so order those too.` });
+  memo(st, { from: 'Plant log', subject: 'Getting started', important: true, body: `The building is bare. From the Catalog, buy a machine and set it down, paint a safety zone on each input square, and hire ${aTitle('operator')}. Nothing runs until materials arrive, so order those too.` });
   const bm = bestMarkets(st.city, 3).map(i => ITEMS[i].name);
   if (bm.length) memo(st, { from: 'Market research', subject: 'Where the openings are', body: `Demand runs furthest ahead of supply for: ${bm.join(', ')}. A product made from bought-in parts gets you selling quickly; making your own components later widens the margin.` });
   pay(st, lot.rent, 'rent', `Rent, ${lot.addr} (first month)`);
@@ -188,15 +190,15 @@ function newLinks(st, before) {
   return out;
 }
 export function beltLineText(st, a, b, kind, k) {
-  const nm = o => o.kind === 'bin' ? `storage bin #${o.id}` : `${FAMILIES[o.family].name} #${o.id}`;
+  const nm = o => o.kind === 'bin' ? `storage bin #${o.id}` : objectLabel(st, o);
   const want = k != null && isProducer(b) ? portItem(b, k) : null;
-  const port = k != null ? `input ${k + 1}${want != null ? ` (${ITEMS[want].name})` : ''}` : 'input';
+  const port = k != null ? `input ${k + 1}${want != null ? ` (${ITEMS[want].name})` : ''}` : 'the input';
   if (kind === 'bin') return `Belt connected: ${nm(a)} output now goes to storage through ${nm(b)}, with no hand carrying.`;
-  if (kind === 'fromBin') return `Belt connected: ${nm(a)} now feeds ${nm(b)} ${port} from storage, with no hand carrying.`;
+  if (kind === 'fromBin') return `Belt connected: ${nm(a)} now feeds ${port} of ${nm(b)} from storage, with no hand carrying.`;
   const out = a.recipe != null ? RECIPES[a.recipe].out : null;
-  if (out != null && want === out) return `Belt connected: ${nm(a)} output to ${nm(b)} ${port}. ${ITEMS[out].name} will ride the belt.`;
+  if (out != null && want === out) return `Belt connected: ${nm(a)} output to ${port} of ${nm(b)}. ${ITEMS[out].name} will ride the belt.`;
   const right = out != null ? inputFor(a, b) : null;
-  return `Belt connected: ${nm(a)} output to ${nm(b)} ${port}, but that input takes ${want != null ? ITEMS[want].name : 'nothing for this product'}` + (right != null ? `. ${ITEMS[out].name} goes in input ${right + 1}, so nothing will move yet.` : `, and ${nm(b)} doesn't use ${out != null ? ITEMS[out].name : 'its output'}, so nothing will move yet.`);
+  return `Belt connected: ${nm(a)} output to ${port} of ${nm(b)}, but that input takes ${want != null ? ITEMS[want].name : 'nothing for this product'}` + (right != null ? `. ${ITEMS[out].name} goes in input ${right + 1}, so nothing will move yet.` : `, and ${nm(b)} doesn't use ${out != null ? ITEMS[out].name : 'its output'}, so nothing will move yet.`);
 }
 export const BELT_PRICE = () => KINDS.conveyor.price;
 // ---------------- material flow
@@ -396,7 +398,7 @@ function finishMove(st) {
   st.floor = nf; st.lotId = mv.lotId; st.rent = lot.rent; st.move = null;
   refreshOperators(st);
   for (const e of st.employees) { e.px = undefined; e.py = undefined; }
-  memo(st, { from: 'Plant manager', subject: `We have moved to ${lot.addr}`, important: true, sound: 'fanfare', body: `The new plant at ${lot.addr} is up and running: ${num(lot.sqft)} sq ft. Everything came across from ${oldAddr}${mv.dropped.length ? `, except ${mv.dropped.length} item${mv.dropped.length > 1 ? 's' : ''} that did not fit and ${mv.dropped.length > 1 ? 'were' : 'was'} sold` : ''}. Check the floor for anything that needs a new belt or safety zone.` });
+  memo(st, { from: 'Plant log', subject: `We have moved to ${lot.addr}`, important: true, sound: 'fanfare', body: `The new plant at ${lot.addr} is up and running: ${num(lot.sqft)} sq ft. Everything came across from ${oldAddr}${mv.dropped.length ? `, except ${mv.dropped.length} item${mv.dropped.length > 1 ? 's' : ''} that did not fit and ${mv.dropped.length > 1 ? 'were' : 'was'} sold` : ''}. Check the floor for anything that needs a new belt or safety zone.` });
 }
 
 // ---------------- production cells
@@ -454,27 +456,27 @@ export function editCell(st, id, items, hatches) {
   const delta = after >= before ? after - before : -Math.round((before - after) * (fresh ? 1 : 0.6));
   if (delta > 0 && st.bank.checking + st.bank.savings + (creditLimit(st) - st.bank.credit) < delta) return { ok: false, msg: `You cannot afford the changes (${money(delta)}).` };
   o.items = items.map(i => ({ ...i })); o.hatches = hatches.map(h => ({ ...h })); o.layoutRev = (o.layoutRev || 0) + 1; fl.rev++;
-  const nm = o.kind === 'suite' ? 'Office suite' : 'Cell';
-  if (delta > 0) pay(st, delta, 'equipment', `Refitted ${nm.toLowerCase()} #${o.id}`); else if (delta < 0) receive(st, -delta, 'equipment', `Extras sold from ${nm.toLowerCase()} #${o.id}`);
+  const nm = objectLabel(st, o);
+  if (delta > 0) pay(st, delta, 'equipment', `Refitted ${nm}`); else if (delta < 0) receive(st, -delta, 'equipment', `Extras sold from ${nm}`);
   o.value = Math.max(0, (o.value || 0) + delta); o.cost = (o.cost || 0) + Math.max(0, delta);
-  return { ok: true, delta, msg: delta > 0 ? `${nm} #${o.id} refitted for ${money(delta)}.` : delta < 0 ? `${nm} #${o.id} refitted; ${money(-delta)} back for removed extras.` : `${nm} #${o.id} layout changed.` };
+  return { ok: true, delta, msg: delta > 0 ? `${nm} refitted for ${money(delta)}.` : delta < 0 ? `${nm} refitted; ${money(-delta)} back for removed extras.` : `${nm} layout changed.` };
 }
 // the productivity bonus of the desk an office worker sits at in a suite (desks are taken in order of arrival)
 export function suiteSeatBonus(st, o, e) {
   const a = analyseSuite(o), i = st.employees.filter(x => x.assign === o.id).indexOf(e);
   return i >= 0 && i < a.deskBonus.length ? a.deskBonus[i] : 0;
 }
-// cell technology research: any Researcher not running a research machine works on it
+// cell technology research: any Research Engineer not running a research machine works on it
 export function startTech(st, id) {
   const t = TECHS[id]; if (!t) return { ok: false, msg: 'No such technology.' };
   st.cellTech = st.cellTech || { done: {}, active: null };
   if (st.cellTech.done[id]) return { ok: false, msg: 'Already researched.' };
-  if (st.cellTech.active) return { ok: false, msg: `Researchers are already on ${TECHS[st.cellTech.active.id].name}.` };
-  if (!has(st, 'researcher')) return { ok: false, msg: `Hire a ${titleFor('researcher')} first.` };
+  if (st.cellTech.active) return { ok: false, msg: `Engineers are already researching ${TECHS[st.cellTech.active.id].name}.` };
+  if (!has(st, 'researcher')) return { ok: false, msg: `Hire ${aTitle('researcher')} first.` };
   if (st.bank.checking + st.bank.savings + (creditLimit(st) - st.bank.credit) < t.cost) return { ok: false, msg: `You cannot afford it. It costs ${money(t.cost)}.` };
   pay(st, t.cost, 'misc', `Research: ${t.name}`);
   st.cellTech.active = { id, hours: 0, need: t.hours };
-  return { ok: true, msg: `Research on ${t.name} started: about ${t.hours} researcher-hours.` };
+  return { ok: true, msg: `Research on ${t.name} started: about ${t.hours} engineer-hours.` };
 }
 export function techResearchers(st) { return st.employees.filter(e => hasRole(e, 'researcher') && !st.floor.objects.some(o => o.id === e.assign && o.mode === 'research')); }
 function techStep(st, dt) {
@@ -509,7 +511,7 @@ export function inputFor(from, to) {
   return k < 0 ? null : k;
 }
 // Lay belts: machine output -> another machine's matching input square, machine output -> storage bin,
-// or storage bin -> a machine's input square k (feeds that material from the warehouse).
+// or storage bin -> a machine's input square k (feeds that material from storage).
 export function connectByBelt(st, fromId, toId, dryRun = false, k = null) {
   const fl = st.floor; const a = fl.objects.find(o => o.id === fromId), b = fl.objects.find(o => o.id === toId);
   if (!a || !b || !(isProducer(a) || a.kind === 'bin')) return { ok: false, msg: 'Pick a machine or storage bin to connect from.' };
@@ -517,11 +519,11 @@ export function connectByBelt(st, fromId, toId, dryRun = false, k = null) {
   if (a.kind === 'bin' && !isProducer(b)) return { ok: false, msg: 'A storage bin can only feed a machine input.' };
   if (isProducer(b)) {
     if (k == null) k = inputFor(a, b);
-    if (k == null) return { ok: false, msg: `${FAMILIES[b.family].name} #${b.id} doesn't use ${a.recipe != null ? ITEMS[RECIPES[a.recipe].out].name : 'that'}. Retool one of them first.` };
+    if (k == null) return { ok: false, msg: `${objectLabel(st, b)} doesn't use ${a.recipe != null ? ITEMS[RECIPES[a.recipe].out].name : 'that'}. Retool one of them first.` };
     if (k >= inputPorts(b).length) return { ok: false, msg: 'That machine has no such input.' };
   }
   const path = autoRoute(fl, a, b, k ?? 0);
-  if (!path) return { ok: false, msg: `No clear path for a belt from #${a.id} to #${b.id}. Clear or move equipment, pallets or safety zones in the way.` };
+  if (!path) return { ok: false, msg: `No clear path for a belt from ${a.kind === 'bin' ? `storage bin #${a.id}` : objectLabel(st, a)} to ${b.kind === 'bin' ? `storage bin #${b.id}` : objectLabel(st, b)}. Clear or move equipment, storage zones or safety zones in the way.` };
   const price = path.length * priceOf({ kind: 'conveyor' });
   if (countKind(fl, 'conveyor') + path.length > KINDS.conveyor.max) return { ok: false, msg: `That needs ${path.length} belt sections, over the limit of ${KINDS.conveyor.max}.` };
   if (dryRun) return { ok: true, tiles: path.length, price, path, k };
@@ -575,7 +577,7 @@ export function liquidateOverflow(st) {
     const v = units * st.city.market[id].price * 0.5;
     addInventory(st, id, -units); over -= Math.ceil(units / ITEMS[id].pack);
     receive(st, v, 'misc', `Liquidated ${num(units)} ${ITEMS[id].name}`);
-    memo(st, { from: 'Warehouse', subject: 'Inventory liquidated', body: `${num(units)} ${ITEMS[id].name} unit(s) were sold off for ${money(v)} because there was no storage space left for them.` });
+    memo(st, { from: 'Plant log', subject: 'Inventory liquidated', body: `${num(units)} ${ITEMS[id].name} unit(s) were sold off for ${money(v)} because there was no storage space left for them.` });
   }
 }
 export function setRecipe(st, id, recipeId) {
@@ -586,7 +588,7 @@ export function setRecipe(st, id, recipeId) {
   const cost = Math.round(FAMILIES[o.family].price * ECONOMY.retoolShare);
   clearLocal(st, o);
   o.recipe = recipeId; o.mode = 'produce'; o.research = null; o.progress = 0;
-  pay(st, cost, 'equipment', `Retooled machine #${o.id} for ${ITEMS[RECIPES[recipeId].out].name}`);
+  pay(st, cost, 'equipment', `Retooled ${objectLabel(st, o)} for ${ITEMS[RECIPES[recipeId].out].name}`);
   return { ok: true, msg: `Retooled for ${ITEMS[RECIPES[recipeId].out].name} at a cost of ${money(cost)}.` };
 }
 export const recipeAvailable = (st, rid) => RECIPES[rid].start || !!st.research.unlocked[rid];
@@ -600,7 +602,7 @@ export function startResearch(st, id, recipeId) {
   const rank = locked.findIndex(r => r.id === recipeId);
   const need = Math.round(140 * (1 + rank * 0.35) * (st.city.aiKnown[recipeId] ? 0.55 : 1));
   o.research = { target: recipeId, hours: 0, need };
-  return { ok: true, msg: `Research on ${ITEMS[RECIPES[recipeId].out].name} started: about ${need} researcher-hours.` };
+  return { ok: true, msg: `Research on ${ITEMS[RECIPES[recipeId].out].name} started: about ${need} engineer-hours.` };
 }
 
 // ---------------- staff
@@ -617,12 +619,12 @@ export function assign(st, empId, objId) {
     const cur = st.employees.find(x => x.assign === objId && x.id !== empId);
     if (cur) return { ok: false, msg: `${fullName(cur)} already works there.` };
   } else if (o.kind === 'cell') {
-    if (!canRunMachine(e)) return { ok: false, msg: `A ${JOBS[e.job].title} doesn't work in production cells. Hire a ${titleFor('operator')}.` };
+    if (!canRunMachine(e)) return { ok: false, msg: `${aOrAn(JOBS[e.job].title, true)} doesn't work in production cells. Hire ${aTitle('operator')}.` };
     const crew = st.employees.filter(x => x.assign === objId && x.id !== empId).length;
     if (crew >= 6) return { ok: false, msg: 'Six operators is the most a cell can use.' };
   } else if (o.kind === 'machine') {
-    if (o.mode === 'research' && !hasRole(e, 'researcher')) return { ok: false, msg: `A machine doing research needs a ${titleFor('researcher')} at it.` };
-    if (o.mode !== 'research' && !canRunMachine(e)) return { ok: false, msg: `A ${JOBS[e.job].title} doesn't run machines. Hire a ${titleFor('operator')}.` };
+    if (o.mode === 'research' && !hasRole(e, 'researcher')) return { ok: false, msg: `A machine doing research needs ${aTitle('researcher')} at it.` };
+    if (o.mode !== 'research' && !canRunMachine(e)) return { ok: false, msg: `${aOrAn(JOBS[e.job].title, true)} doesn't run machines. Hire ${aTitle('operator')}.` };
     const cur = st.employees.find(x => x.assign === objId && x.id !== empId);
     if (cur) return { ok: false, msg: `${fullName(cur)} already runs that machine.` };
   } else return { ok: false, msg: 'People can only be assigned to machines and offices.' };
@@ -744,7 +746,7 @@ export function suggestedTargets(st) {
     if (ITEMS[id].tier !== 'material' && st.floor.objects.some(o => isProducer(o) && o.mode === 'produce' && RECIPES[o.recipe].out === id)) continue;
     out[id] = Math.max(2, Math.ceil(dailyUse(st, id) * 3 / ITEMS[id].pack));
   }
-  // keep at least 40% of the warehouse free for finished goods
+  // keep at least 40% of storage free for finished goods
   const cap = storageCapacity(st.floor) * 0.6, total = Object.values(out).reduce((s, v) => s + v, 0);
   if (total > cap) for (const k of Object.keys(out)) out[k] = Math.max(1, Math.floor(out[k] * cap / total));
   return out;
@@ -864,8 +866,8 @@ function startOfDay(st) {
   // outside repair service for broken machines when we have no maintenance staff
   if (!st.employees.some(e => hasRole(e, 'maintenance') && !e.state)) for (const o of st.floor.objects) if (isProducer(o) && o.broken) {
     const fee = Math.round(FAMILIES[o.family].price * ECONOMY.outsideRepairShare);
-    pay(st, fee, 'running', `Outside repair service, machine #${o.id}`); o.broken = false; o.repair = 0; o.credits = 70;
-    memo(st, { from: 'Plant manager', subject: `Machine #${o.id} repaired`, body: `An outside repair crew fixed machine #${o.id} for ${money(fee)}. A ${titleFor('maintenance')} on staff would do this for the price of a salary.` });
+    pay(st, fee, 'running', `Outside repair service, ${objectLabel(st, o)}`); o.broken = false; o.repair = 0; o.credits = 70;
+    memo(st, { from: 'Plant log', subject: `${objectLabel(st, o)} repaired`, body: `An outside repair service fixed ${objectLabel(st, o)} for ${money(fee)}. ${aTitle('maintenance', true)} on staff would do this for the price of a salary.` });
   }
 }
 
@@ -875,7 +877,7 @@ function autoPurchase(st) {
   let cap = Math.max(1, Math.round(st.dept.purchCap || staff.length * 4));
   const targets = Object.keys(st.targets).length ? st.targets : suggestedTargets(st);
   for (const [id, target] of Object.entries(targets)) {
-    if (cap <= 0) { if (!st.flags.purchWarn || st.time - st.flags.purchWarn > 21 * MIN_PER_DAY) { st.flags.purchWarn = st.time; memo(st, { from: 'Supply', subject: 'Reorders are piling up', body: `Some reorders had to wait for another day. One more ${titleFor('purchasing')} would keep up.` }); } break; }
+    if (cap <= 0) { if (!st.flags.purchWarn || st.time - st.flags.purchWarn > 21 * MIN_PER_DAY) { st.flags.purchWarn = st.time; memo(st, { from: 'Purchasing', subject: 'Reorders are piling up', body: `Some reorders had to wait for another day. One more ${titleFor('purchasing')} would keep up.` }); } break; }
     const need = Math.min(target - boxesOf(st, +id) - onOrderBoxes(st, +id), roomForOrders(st));
     if (need <= 0) continue;
     const v = bestVendor(st, +id); if (!v) continue;
@@ -952,8 +954,8 @@ function work(st, t0, dt) {
       // inputs come only from what is at the machine: delivered by belt or carried in
       let ok = true;
       for (const [it, q] of r.inputs) if ((o.inBuf[it] || 0) < q * yf / r.outQty - 1e-9) { ok = false; break; }
-      if (!ok) { why = o.trip ? 'Waiting for materials' : r.inputs.some(([it]) => (st.inventory[it] || 0) + (o.inBuf[it] || 0) > 0) ? 'Waiting for materials' : 'Input empty'; break; }
-      if (o.tray + 1 > trayMax + 1e-9) { pushOutput(st, o); if (o.tray + 1 > trayMax + 1e-9) { why = o.outLanes ? 'Output blocked: belt full' : freeBoxes(st) <= 0 ? 'Output full: warehouse full' : 'Output tray full'; break; } }
+      if (!ok) { why = o.trip ? 'Waiting for materials' : r.inputs.some(([it]) => (st.inventory[it] || 0) + (o.inBuf[it] || 0) > 0) ? 'Waiting for materials' : 'Out of materials'; break; }
+      if (o.tray + 1 > trayMax + 1e-9) { pushOutput(st, o); if (o.tray + 1 > trayMax + 1e-9) { why = o.outLanes ? 'Output blocked: belt full' : freeBoxes(st) <= 0 ? 'Output full: storage full' : 'Output tray full'; break; } }
       for (const [it, q] of r.inputs) {
         o.inBuf[it] -= q * yf / r.outQty; if (o.inBuf[it] <= 1e-9) delete o.inBuf[it];
         st.quality['in' + it] = st.quality['in' + it] ?? 55;
@@ -980,7 +982,7 @@ function work(st, t0, dt) {
     const hazard = (0.004 + (o.credits < 25 ? 0.05 : 0)) * dt / 60 * (CA ? 1.5 - CA.metrics.uptime / 100 : 1);
     if (o.status === 'Running' && chance(st, hazard)) {
       o.broken = true; o.repair = 0; o.status = 'Broken';
-      memo(st, { from: 'Plant manager', subject: `Machine #${o.id} broke down`, important: !maint.length, sound: 'breakdown', body: `Machine #${o.id} (${FAMILIES[o.family].name}) has stopped with a fault.${maint.length ? ' A mechanic is on the way.' : ` Nobody on staff can fix it, so an outside crew comes first thing tomorrow.`}` });
+      memo(st, { from: 'Plant log', subject: `${objectLabel(st, o)} broke down`, important: !maint.length, sound: 'breakdown', body: `${objectLabel(st, o)} has stopped with a fault.${maint.length ? ` ${aTitle('maintenance', true)} is on the way.` : ` Nobody on staff can fix it, so an outside repair service comes first thing tomorrow.`}` });
     }
     // accidents at hand-fed input squares without a safety zone (each one adds risk)
     if (o.status === 'Running' && isCell) {
@@ -997,7 +999,7 @@ function work(st, t0, dt) {
     const order = machines.filter(o => o.broken).concat(machines.filter(o => !o.broken).sort((a, b) => a.credits - b.credits));
     for (const o of order) {
       if (maintPower <= 0) break;
-      if (o.broken) { const use = Math.min(maintPower, (1 - o.repair) * 4); o.repair += use / 4; maintPower -= use; if (o.repair >= 0.999) { o.broken = false; o.repair = 0; o.credits = 85; bus.push(`Machine #${o.id} is repaired.`); bus.sound('repair'); } }
+      if (o.broken) { const use = Math.min(maintPower, (1 - o.repair) * 4); o.repair += use / 4; maintPower -= use; if (o.repair >= 0.999) { o.broken = false; o.repair = 0; o.credits = 85; bus.push(`${objectLabel(st, o)} is repaired.`); bus.sound('repair'); } }
       else if (o.credits < 98) { const use = Math.min(maintPower, (100 - o.credits) / 30); o.credits = Math.min(100, o.credits + use * 30); maintPower -= use; }
     }
   }
@@ -1005,8 +1007,8 @@ function work(st, t0, dt) {
 
 function researchStep(st, o, op, dt) {
   if (!o.research) { o.status = 'Research: no project'; return; }
-  if (!op || !hasRole(op, 'researcher')) { o.status = 'Research: needs an engineer'; return; }
-  if (op.act !== 'work') { o.status = 'Research: researcher away'; return; }
+  if (!op || !hasRole(op, 'researcher')) { o.status = 'Research: no engineer'; return; }
+  if (op.act !== 'work') { o.status = 'Research: engineer away'; return; }
   const dir = st.employees.find(e => hasRole(e, 'research_lead') && e.act === 'work');
   o.research.hours += dt / 60 * (0.5 + skill(op)) * (1 + (dir ? 0.5 * skill(dir) : 0));
   o.status = `Research ${Math.min(99, Math.floor(o.research.hours / o.research.need * 100))}%`;
@@ -1015,7 +1017,7 @@ function researchStep(st, o, op, dt) {
     if (chance(st, 0.85)) {
       st.research.unlocked[rid] = true; st.research.done.push({ rid, t: st.time });
       o.research = null; o.mode = 'produce';
-      memo(st, { from: 'Engineering', subject: `Ready to make: ${ITEMS[r.out].name}`, important: true, sound: 'research', body: `Engineering has a working ${ITEMS[r.out].name} process. You can now retool any ${FAMILIES[r.family].name} machine for it. Machine #${o.id} has gone back to its old product.` });
+      memo(st, { from: 'Engineering', subject: `Ready to make: ${ITEMS[r.out].name}`, important: true, sound: 'research', body: `Engineering has a working ${ITEMS[r.out].name} process. You can now retool any ${FAMILIES[r.family].name} machine for it. ${objectLabel(st, o)} has gone back to its old product.` });
     } else {
       o.research.hours = o.research.need * 0.5;
       memo(st, { from: 'Engineering', subject: `${ITEMS[r.out].name} trial failed`, body: `The first ${ITEMS[r.out].name} run didn't pass inspection, so the project is back to about half done. We do know the bill of materials now: ${r.inputs.map(([i, q]) => `${q} × ${ITEMS[i].name}`).join(', ')}.` });
@@ -1025,10 +1027,10 @@ function researchStep(st, o, op, dt) {
 
 function accident(st, o, op, inCell = false) {
   const fine = Math.round(rand(st, 2500, 12000) / 100) * 100;
-  pay(st, fine, 'fines', `Insurance deductible, accident at ${o.kind === 'cell' ? 'cell' : 'machine'} #${o.id}`);
+  pay(st, fine, 'fines', `Insurance deductible, accident at ${objectLabel(st, o)}`);
   op.injuredUntil = st.time + randInt(st, 2, 8) * MIN_PER_DAY; op.state = 'injured'; op.act = 'injured';
   for (const e of st.employees) e.morale = clamp(e.morale - 6, 0, 100);
-  memo(st, { from: 'Insurance carrier', subject: 'Accident on the floor', important: true, sound: 'accident', body: inCell ? `${fullName(op)} was hurt in cell #${o.id} and will be out for several days. Our deductible is ${money(fine)}. Guards, fans, mats and a less crowded layout raise a cell's Safety.` : `${fullName(op)} was hurt at the input of machine #${o.id} and will be out for several days. Our deductible is ${money(fine)}. Hand-fed machine inputs need a safety zone in front of them.` });
+  memo(st, { from: 'Insurance carrier', subject: 'Accident on the floor', important: true, sound: 'accident', body: inCell ? `${fullName(op)} was hurt in ${objectLabel(st, o)} and will be out for several days. Our deductible is ${money(fine)}. Guards, fans, mats and a less crowded layout raise a cell's Safety.` : `${fullName(op)} was hurt at an input of ${objectLabel(st, o)} and will be out for several days. Our deductible is ${money(fine)}. Hand-fed machine inputs need a safety zone in front of them.` });
 }
 
 function receiveOrder(st, o) {
@@ -1185,19 +1187,19 @@ function presidentAdvice(st) {
   if (machines.some(o => o.operator == null && o.mode === 'produce')) tips.push('A machine is standing idle with nobody to run it.');
   const white = st.employees.filter(isWhite);
   if (white.some(e => e.assign == null)) tips.push('An office worker has no desk. Buy an office and seat them in it.');
-  if (!has(st, 'finance') && st.employees.length >= 3) tips.push(`Nobody keeps the books. Without a ${titleFor('finance')}, customers pay late and our own bills slip.`);
-  if (!has(st, 'sales') && st.ledger.produced > 0) tips.push(`Goods only sell to walk-in buyers. An ${titleFor('sales')} would win far more orders.`);
+  if (!has(st, 'finance') && st.employees.length >= 3) tips.push(`Nobody keeps the books. Without ${aTitle('finance')}, customers pay late and our own bills slip.`);
+  if (!has(st, 'sales') && st.ledger.produced > 0) tips.push(`Goods only sell to walk-in customers. ${aTitle('sales', true)} would win far more orders.`);
   if (!has(st, 'purchasing') && machines.length >= 2) tips.push(`With no ${titleFor('purchasing')}, you place every material order yourself.`);
-  if (machines.some(o => o.broken) && !has(st, 'maintenance')) tips.push(`A ${titleFor('maintenance')} would service machines before they break.`);
-  if (machines.length >= 3 && !countKind(fl, 'handcart') && !countKind(fl, 'forklift')) tips.push('The crew carries every box by hand. A pallet jack or forklift would free them up.');
-  for (const o of machines) { if (o.mode !== 'produce' || o.recipe == null) continue; if (unsafeInputs(fl, o).length) { tips.push(`Machine #${o.id} has an input square with no safety zone.`); break; } }
+  if (machines.some(o => o.broken) && !has(st, 'maintenance')) tips.push(`${aTitle('maintenance', true)} would service machines before they break.`);
+  if (machines.length >= 3 && !countKind(fl, 'handcart') && !countKind(fl, 'forklift')) tips.push('Operators carry every box by hand. A pallet jack or forklift would free them up.');
+  for (const o of machines) { if (o.mode !== 'produce' || o.recipe == null) continue; if (unsafeInputs(fl, o).length) { tips.push(`${objectLabel(st, o)} has an input square with no safety zone.`); break; } }
   if (freeBoxes(st) < 15) tips.push('Storage is almost out of room. Paint more storage or sell some stock.');
   if (!tips.length) return;
   const key = tips.join('|');
   if (key === st.flags.lastAdvice && st.time - (st.flags.lastAdviceT || 0) < 28 * MIN_PER_DAY) return;
   st.flags.lastAdvice = key; st.flags.lastAdviceT = st.time;
   const chief = st.employees.find(e => hasRole(e, 'chief'));
-  memo(st, { from: chief ? fullName(chief) : 'Plant manager', subject: 'To do this week', body: tips.map(t => '• ' + t).join('\n') });
+  memo(st, { from: chief ? fullName(chief) : 'Plant log', subject: 'To do this week', body: tips.map(t => '• ' + t).join('\n') });
 }
 
 export function settleStrike(st) {
@@ -1237,7 +1239,7 @@ function endOfMonth(st) {
   const salesTotal = Object.values(st.stats.revenueMonth).reduce((s, v) => s + v, 0);
   const prodTotal = Object.values(st.stats.producedMonth).reduce((s, v) => s + v, 0);
   if (salesTotal > 0 && salesTotal > st.stats.bestSales && st.history.length > 1) memo(st, { from: 'Finance', subject: 'Best sales month yet', body: `We sold ${money(salesTotal)} worth of goods last month, more than in any month before.` });
-  if (prodTotal > 0 && prodTotal > st.stats.bestProd && st.history.length > 1) memo(st, { from: 'Plant manager', subject: 'Busiest month on the floor', body: `The plant turned out ${num(prodTotal)} units last month. We have never made more.` });
+  if (prodTotal > 0 && prodTotal > st.stats.bestProd && st.history.length > 1) memo(st, { from: 'Plant log', subject: 'Busiest month on the floor', body: `The plant turned out ${num(prodTotal)} units last month. We have never made more.` });
   st.stats.bestSales = Math.max(st.stats.bestSales, salesTotal); st.stats.bestProd = Math.max(st.stats.bestProd, prodTotal);
   st.stats.salesTrend.push(salesTotal); st.stats.prodTrend.push(prodTotal);
   const tr = st.stats.salesTrend; if (tr.length >= 4 && tr[tr.length - 1] < tr[tr.length - 2] && tr[tr.length - 2] < tr[tr.length - 3] && tr[tr.length - 3] < tr[tr.length - 4]) memo(st, { from: 'Finance', subject: 'Three down months', body: 'Sales have dropped for three months in a row. Keep a close eye on cash until they pick up.' });

@@ -6,7 +6,7 @@ Lease a plant in one of 42 American cities. Fill it with machines, wire them tog
 crew with real personalities, buy materials from the local market and sell what you make. Start with a single
 machine stamping out housings or coils, then build the chain up to lamps, toasters, tents, toys and office machines.
 
-![The factory floor: a die-casting cell belts weighted bases into a lighting line, with offices and the crew at work](docs/images/floor.png)
+![The factory floor: a die-casting line belts weighted bases into a lighting line, with offices and the crew at work](docs/images/floor.png)
 
 Everything is drawn in code as pixel art. There are no image files, no server and no account. Every screen works with
 a keyboard and a screen reader.
@@ -29,8 +29,8 @@ repository, the latest build is also published there.
    die-casting, coil winding, board assembly, machining, and cut-and-sew. Seven make finished goods: lighting,
    furniture, small appliances, outdoor gear, toys, home electronics and office machines. Each machine needs clear
    input squares, an output square, an operator's post and a service hatch. Paint safety zones on hand-fed inputs.
-4. **Hire people.** Line workers run machines. A supervisor speeds up the floor and a mechanic keeps it running.
-   Office staff (bookkeepers, buyers, account reps, promoters) each need a desk. Everyone has 31 traits that decide
+4. **Hire people.** Machine Operators run machines. A Floor Supervisor speeds up the floor and a Plant Mechanic keeps
+   it running. Office staff (Bookkeepers, Materials Buyers, Sales Reps, Marketers) each need a desk. Everyone has 31 traits that decide
    how well they fit a job.
 5. **Buy and sell.** Materials arrive at your shipping dock and go into storage. Finished goods ship at 3 pm on
    weekdays. Prices move with supply and demand, and your own sales move them too.

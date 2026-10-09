@@ -3,6 +3,8 @@
 // src/sim/game.js, add the migration, and keep the old fixtures here (add a new one for the new version).
 import fs from 'fs'; import path from 'path';
 import * as G from '../src/sim/game.js';
+import { JOBS } from '../src/core/content.js';
+import { objectLabel } from '../src/sim/floor.js';
 import { ok, done } from './lib.mjs';
 const dir = path.join(path.dirname(new URL(import.meta.url).pathname), 'fixtures');
 const files = fs.readdirSync(dir).filter(f => /^save-v\d+\.json$/.test(f)).sort();
@@ -12,6 +14,10 @@ for (const f of files) {
   const raw = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
   const from = raw.v, st = G.migrate(raw);
   ok(st.v === G.VERSION, `${f}: format ${from} migrates to ${G.VERSION}`);
+  // old saves store job keys, so every employee shows a current title, and every machine and cell a current label
+  ok(st.employees.length > 0 && st.employees.every(e => JOBS[e.job]?.title), `${f}: every employee has a job title (${[...new Set(st.employees.map(e => JOBS[e.job].title))].join(', ')})`);
+  ok(st.employees.some(e => JOBS[e.job].title === 'Machine Operator'), `${f}: Line Worker saves show "Machine Operator"`);
+  ok(st.floor.objects.filter(o => o.kind === 'machine' || o.kind === 'cell').every(o => /^[A-Z][\w -]+ (line machine|cell) #\d+$/.test(objectLabel(st, o)) && !/cell cell/.test(objectLabel(st, o))), `${f}: machines and cells show the new labels`);
   const made = st.floor.objects.reduce((a, o) => a + (o.produced || 0), 0), t0 = st.time;
   let err = null;
   try { G.advance(st, 30 * 1440); checkNaN(st); } catch (e) { err = e; }

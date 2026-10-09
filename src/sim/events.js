@@ -1,6 +1,6 @@
 // Monthly city events and the business advisor's assessment.
 import { ITEMS, RECIPES, FAMILIES, EVENTS } from '../gen/data.js';
-import { hasRole, jobFor, FIRM_PREFIX, FIRM_SUFFIX, LAST } from '../core/content.js';
+import { hasRole, jobFor, aOrAn, FIRM_PREFIX, FIRM_SUFFIX, LAST } from '../core/content.js';
 import { rand, pick, chance, clamp, money, num, pct } from '../core/util.js';
 import { memo, isSelling, netWorth, freeBoxes, salesAttractiveness, accountingDelay, unsafeInputs } from './game.js';
 import { ports, links, ZONE, countKind } from './floor.js';
@@ -82,12 +82,12 @@ export function advisorReport(st) {
   const avgEff = running.length ? running.reduce((s, o) => s + o.effAvg, 0) / running.length : 0;
   if (running.length && avgEff < 0.5) {
     const carry = !countKind(fl, 'handcart') && !countKind(fl, 'forklift');
-    out.push(`Machines run at ${pct(avgEff)} of their rated speed on average.${carry ? ' The crew carries every box by hand: a pallet jack, a forklift or belts between machines would win a lot of that back.' : ''}${!has('foreman') && running.length >= 3 ? ` A ${jobFor('foreman').title} would get more out of the crew.` : ''}`);
+    out.push(`Machines run at ${pct(avgEff)} of their rated speed on average.${carry ? ' Operators carry every box by hand: a pallet jack, a forklift or belts between machines would win a lot of that back.' : ''}${!has('foreman') && running.length >= 3 ? ` ${aOrAn(jobFor('foreman').title, true)} would get more out of the crew.` : ''}`);
   }
   const unsafe = running.filter(o => unsafeInputs(fl, o).length);
   if (unsafe.length) out.push(`${unsafe.length === 1 ? 'One machine has' : unsafe.length + ' machines have'} an unguarded input square: no safety zone and no belt. Injuries cost money and morale.`);
-  if (!has('sales') && Object.keys(st.inventory).some(id => ITEMS[id].tier !== 'material')) out.push(`Only walk-in buyers find you. An ${jobFor('sales').title} would win a much bigger share of each market.`);
-  if (!has('marketing') && st.history.length >= 2) out.push(`Few shoppers have heard of you. A ${jobFor('marketing').title} builds awareness month by month.`);
+  if (!has('sales') && Object.keys(st.inventory).some(id => ITEMS[id].tier !== 'material')) out.push(`Only walk-in customers find you. ${aOrAn(jobFor('sales').title, true)} would win a much bigger share of each market.`);
+  if (!has('marketing') && st.history.length >= 2) out.push(`Few shoppers have heard of you. ${aOrAn(jobFor('marketing').title, true)} builds awareness month by month.`);
   for (const id of Object.keys(st.inventory).map(Number)) {
     if (ITEMS[id].tier === 'material' || !isSelling(st, id)) continue;
     const { r } = salesAttractiveness(st, id);

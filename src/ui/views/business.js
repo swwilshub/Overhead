@@ -2,9 +2,9 @@ import { h, table, kv, announce, dialog, confirmBox, pill, meter, field, prefs }
 import { app, go, render as rerender, act, applyPrefs, NAV } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES, ECONOMY } from '../../gen/data.js';
-import { JOBS, hasRole, jobFor } from '../../core/content.js';
+import { JOBS, hasRole, jobFor, aOrAn } from '../../core/content.js';
 import { vendorsFor, unitsPerHour, WORKDAYS_PER_MONTH } from '../../sim/world.js';
-import { storageCapacity, isProducer } from '../../sim/floor.js';
+import { storageCapacity, isProducer, objectLabel } from '../../sim/floor.js';
 import { TECHS, CELL_ITEMS } from '../../sim/cells.js';
 import { money, money2, num, pct, fmtDate, fmtShortDate, monthLabel, moneyShort, EPOCH } from '../../core/util.js';
 import { saveGame, listSaves, exportFile, submitScore } from '../storage.js';
@@ -27,9 +27,9 @@ export const purchasing = {
     const rows = ids.map(id => ({ id, name: ITEMS[id].name, boxes: G.boxesOf(st, id), units: st.inventory[id] || 0, onOrder: G.onOrderBoxes(st, id), target: targets[id] ?? 0, use: G.dailyUse(st, id), best: G.bestVendor(st, id) }));
     const anyItem = h('select', { id: 'buy-any' }, ['material', 'component', 'product'].map(t => h('optgroup', { label: t === 'material' ? 'Raw materials' : t === 'component' ? 'Components' : 'Finished goods' }, ITEMS.filter(i => i.tier === t).map(i => h('option', { value: i.id }, i.name)))));
     return h('div', { class: 'stack' },
-      h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Purchasing'), h('p', null, staffed ? 'Your buyers top stock up to the targets below every morning.' : `Nobody does the buying, so stock only gets reordered when you do it. A ${jobFor('purchasing').title} would handle it every morning.`)),
+      h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Purchasing'), h('p', null, staffed ? 'Purchasing staff reorder stock up to the targets below every morning.' : `Nobody does the buying, so stock only gets reordered when you do it. ${aOrAn(jobFor('purchasing').title, true)} would handle it every morning.`)),
         h('div', { class: 'row' }, h('button', { type: 'button', onclick: () => { st.targets = G.suggestedTargets(st); act({ ok: true, msg: 'Targets set to about three days of use.' }); } }, 'Suggest targets'), h('button', { class: 'primary', type: 'button', onclick: () => act(G.purchaseAll(st), false, 'order') }, 'Purchase all to target'))),
-      h('section', { class: 'card' }, kv([['Warehouse', `${num(stored)} of ${num(cap)} boxes (${pct(stored / cap)})`], ['On order', `${num(G.allOnOrder(st))} boxes`], ['Room left for orders', `${num(G.roomForOrders(st))} boxes (15% is held back for finished goods)`]])),
+      h('section', { class: 'card' }, kv([['Storage', `${num(stored)} of ${num(cap)} boxes (${pct(stored / cap)})`], ['On order', `${num(G.allOnOrder(st))} boxes`], ['Room left for orders', `${num(G.roomForOrders(st))} boxes (15% is held back for finished goods)`]])),
       h('section', { class: 'card' }, h('h2', null, 'Stock and targets'),
         table('Materials and components', [
           { key: 'name', label: 'Item' },
@@ -58,7 +58,7 @@ export async function buyDialog(itemId) {
     vs.map(v => { const left = v.monthlyBoxes - (st.vendorBought[v.firm + ':' + itemId] || 0); return h('div', { class: 'row', style: { flexWrap: 'nowrap', alignItems: 'flex-start' } },
       h('input', { type: 'radio', name: 'vendor', id: 'v-' + v.firm, value: v.firm, checked: v.firm === chosen, disabled: left <= 0, onchange: () => { chosen = v.firm; } }),
       h('label', { for: 'v-' + v.firm, style: { fontWeight: 400 } }, h('strong', null, v.name), ` — ${money2(v.boxPrice)} per box of ${ITEMS[itemId].pack}, quality ${v.quality}, about ${Math.round(v.minutes / 60 * 10) / 10} hours to deliver, ${left > 0 ? num(left) + ' boxes left this month' : 'sold out this month'}`)); }));
-  await dialog(`Buy ${ITEMS[itemId].name}`, h('div', { class: 'stack' }, h('p', null, `In stock: ${num(G.boxesOf(st, itemId))} boxes. Warehouse room: ${num(G.freeBoxes(st))} boxes. You pay the invoice ten days after delivery.`), radios, field('Boxes', boxes)),
+  await dialog(`Buy ${ITEMS[itemId].name}`, h('div', { class: 'stack' }, h('p', null, `In stock: ${num(G.boxesOf(st, itemId))} boxes. Room in storage: ${num(G.freeBoxes(st))} boxes. You pay the invoice ten days after delivery.`), radios, field('Boxes', boxes)),
     [{ label: 'Cancel', value: null }, { label: 'Place order', primary: true, run: () => { const r = G.placeOrder(st, itemId, chosen, +boxes.value); act(r, false, 'order'); return r.ok; } }]);
 }
 
@@ -70,7 +70,7 @@ export const sales = {
     const ids = [...new Set([...Object.keys(st.inventory).map(Number), ...st.floor.objects.filter(o => o.kind === 'machine' && o.recipe != null).map(o => RECIPES[o.recipe].out)])].filter(i => ITEMS[i].tier !== 'material');
     const rows = ids.map(id => { const m = st.city.market[id]; const a = G.salesAttractiveness(st, id); return { id, name: ITEMS[id].name, units: st.inventory[id] || 0, market: m.price, price: a.price, r: a.r, q: st.quality[id] ?? 55, sold: st.stats.soldMonth[id] || 0, rev: st.stats.revenueMonth[id] || 0, demand: m.demand, selling: G.isSelling(st, id) }; });
     return h('div', { class: 'stack' },
-      h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Sales'), h('p', null, 'Orders ship every weekday at 3 pm. Customers pay about two weeks later, or later still if Accounting falls behind.'))),
+      h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Sales'), h('p', null, 'Orders ship every weekday at 3 pm. Customers pay about two weeks later, or later still if Finance falls behind.'))),
       h('section', { class: 'card' }, kv([['Sales effort', `${st.dept.salesEff.toFixed(2)} ${st.dept.salesEff < 0.5 ? '(no sales staff)' : ''}`], ['Brand awareness', pct(st.dept.awareness)], ['Owed to us (receivables)', money(G.arTotal(st))], ['Last shipment', st.lastShip ? `${fmtShortDate(st.lastShip.t)}: ${st.lastShip.lines.join(', ')} for ${money(st.lastShip.total)}` : 'None yet']])),
       salesCharts(st),
       h('section', { class: 'card' }, h('h2', null, 'Products'),
@@ -185,7 +185,7 @@ function reportBody(st, tab) {
     }
     case 'pl': return [h('h2', null, 'Profit and loss'), h('div', { class: 'grid2' }, h('div', null, plTable(st.ledger, `This month (${monthLabel(st.ledger.month)}, so far)`)), last ? h('div', null, plTable(last, `Last month (${monthLabel(last.month)})`)) : h('p', { class: 'muted' }, 'No completed month yet.'))];
     case 'assets': return [h('h2', null, 'Assets'), table('Equipment', [{ key: 'name', label: 'Item' }, { key: 'bought', label: 'Bought', render: o => fmtShortDate(o.bought) }, { key: 'cost', label: 'Paid', num: true, render: o => money(o.cost) }, { key: 'value', label: 'Value now', num: true, render: o => money(o.value) }],
-      st.floor.objects.filter(o => !o.fixed).map(o => ({ ...o, name: o.kind === 'conveyor' ? 'Conveyor section' : (o.kind === 'machine' ? FAMILIES[o.family].name + ' machine #' + o.id : o.kind === 'office' ? 'Office #' + o.id : o.kind) })), { hideCaption: true })];
+      st.floor.objects.filter(o => !o.fixed).map(o => ({ ...o, name: o.kind === 'conveyor' ? 'Conveyor section' : objectLabel(st, o) })), { hideCaption: true })];
     case 'inventory': return [h('h2', null, 'Inventory'), table('Stored goods', [{ key: 'name', label: 'Item' }, { key: 'boxes', label: 'Boxes', num: true }, { key: 'units', label: 'Units', num: true, render: r => num(r.units) }, { key: 'value', label: 'Value', num: true, render: r => money(r.value) }],
       Object.entries(st.inventory).map(([id, u]) => ({ name: ITEMS[id].name, boxes: G.boxesOf(st, +id), units: u, value: u * st.city.market[id].price * 0.75 })), { hideCaption: true })];
     case 'purchases': {
@@ -195,7 +195,7 @@ function reportBody(st, tab) {
         ids.map(id => ({ name: ITEMS[id].name, target: st.targets[id] ?? '—', arrived: bought[id] || 0, transit: G.onOrderBoxes(st, +id), est: st.city.market[id].price * ITEMS[id].pack })), { hideCaption: true })];
     }
     case 'production': return [h('h2', null, 'Production report'), table('Machines', [{ key: 'name', label: 'Machine' }, { key: 'product', label: 'Product' }, { key: 'month', label: 'This month', num: true, render: r => num(r.month) }, { key: 'total', label: 'Total', num: true, render: r => num(r.total) }, { key: 'eff', label: 'Efficiency', num: true, render: r => pct(r.eff) }, { key: 'date', label: 'Bought', render: r => fmtShortDate(r.date) }],
-      st.floor.objects.filter(o => isProducer(o)).map(o => ({ name: `${FAMILIES[o.family].name} ${o.kind === 'cell' ? 'cell ' : ''}#${o.id}`, product: o.mode === 'research' ? 'Research' : ITEMS[RECIPES[o.recipe].out].name, month: o.producedMonth, total: o.produced, eff: o.effAvg, date: o.bought })), { hideCaption: true })];
+      st.floor.objects.filter(o => isProducer(o)).map(o => ({ name: objectLabel(st, o), product: o.mode === 'research' ? 'Research' : ITEMS[RECIPES[o.recipe].out].name, month: o.producedMonth, total: o.produced, eff: o.effAvg, date: o.bought })), { hideCaption: true })];
     case 'salesr': return [h('h2', null, 'Sales report'), table('Sales this month', [{ key: 'name', label: 'Product' }, { key: 'units', label: 'Units sold', num: true, render: r => num(r.units) }, { key: 'income', label: 'Income', num: true, render: r => money(r.income) }, { key: 'share', label: 'Market share', num: true, render: r => pct(r.share) }, { key: 'price', label: 'Unit price', num: true, render: r => money2(r.price) }],
       Object.keys(st.stats.soldMonth).map(id => ({ name: ITEMS[id].name, units: st.stats.soldMonth[id], income: st.stats.revenueMonth[id], share: st.stats.soldMonth[id] / Math.max(1, st.city.market[id].demand), price: st.stats.revenueMonth[id] / st.stats.soldMonth[id] })), { hideCaption: true, empty: 'No sales yet this month.' })];
     case 'trends': return [h('h2', null, 'Trends'), trendChart(st), monthlyTable(st)];
@@ -229,7 +229,7 @@ function techSection(st) {
   const rows = Object.entries(TECHS).map(([id, t]) => ({ id, ...t, unlocks: Object.values(CELL_ITEMS).filter(d => d.tech === id).map(d => d.name).join(', '), done: !!ct.done[id], active: a?.id === id }));
   return h('section', { class: 'card stack', 'aria-labelledby': 'tech-h' }, h('h2', { id: 'tech-h' }, 'Cell technology'),
     h('p', null, `Unlocks extras for production cells. Any ${jobFor('researcher').title} not at a research machine works on it (${free.length} now). One project at a time; you pay when it starts.`),
-    a ? h('div', { class: 'stack', style: { gap: '4px' } }, h('p', null, h('strong', null, TECHS[a.id].name), ` · ${Math.floor(a.hours)} of ${a.need} researcher-hours${free.length ? '' : ' · paused: no engineer is free'}`), meter(a.hours / a.need, `${TECHS[a.id].name} progress`)) : null,
+    a ? h('div', { class: 'stack', style: { gap: '4px' } }, h('p', null, h('strong', null, TECHS[a.id].name), ` · ${Math.floor(a.hours)} of ${a.need} engineer-hours${free.length ? '' : ' · paused: no engineer is free'}`), meter(a.hours / a.need, `${TECHS[a.id].name} progress`)) : null,
     table('Cell technologies', [
       { key: 'name', label: 'Technology', render: r => h('span', null, h('strong', null, r.name), h('br'), h('small', { class: 'muted' }, r.desc)) },
       { key: 'unlocks', label: 'Unlocks' },
@@ -245,9 +245,9 @@ export const research = {
     const rm = st.floor.objects.filter(o => o.kind === 'machine' && o.mode === 'research');
     const locked = RECIPES.filter(r => !G.recipeAvailable(st, r.id));
     return h('div', { class: 'stack' },
-      h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Research'), h('p', null, `Some products have to be developed before you can make them. Pick a machine of the right line on the floor, choose "Research a new product" and put a ${jobFor('researcher').title} on it. A ${jobFor('research_lead').title} speeds up every project.`))),
+      h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Research'), h('p', null, `Some products have to be developed before you can make them. Pick a machine of the right line on the floor, choose "Research a new product" and put ${aOrAn(jobFor('researcher').title)} on it. ${aOrAn(jobFor('research_lead').title, true)} speeds up every project.`))),
       h('section', { class: 'card' }, h('h2', null, 'Projects under way'), table('Projects', [
-        { key: 'm', label: 'Machine', render: o => `${FAMILIES[o.family].name} #${o.id}` },
+        { key: 'm', label: 'Machine', render: o => objectLabel(st, o) },
         { key: 't', label: 'Target', render: o => o.research ? ITEMS[RECIPES[o.research.target].out].name : '—' },
         { key: 'p', label: 'Progress', render: o => o.research ? h('span', { class: 'row' }, meter(o.research.hours / o.research.need, 'Progress'), `${Math.floor(o.research.hours)} / ${o.research.need} h`) : '—' },
         { key: 's', label: 'Status', render: o => o.status }], rm, { hideCaption: true, empty: 'No research running.' })),
@@ -299,7 +299,7 @@ export const options = {
         h('ol', { style: { margin: 0, paddingLeft: '1.2em', display: 'grid', gap: '6px' } },
           h('li', null, 'Lease a building in a city. Rent is due on the first of each month.'),
           h('li', null, "Buy a machine from the Catalog and set it on the floor. Leave its input squares, output square, operator's post and service hatch clear, and paint a safety zone on each input square."),
-          h('li', null, `Hire a ${jobFor('operator').title} and put them on the machine. Office staff each need a desk.`),
+          h('li', null, `Hire ${aOrAn(jobFor('operator').title)} and put them on the machine. Office staff each need a desk.`),
           h('li', null, 'Buy materials on the Purchasing page. Deliveries land in your storage zones; paint more storage as you grow.'),
           h('li', null, 'Start the clock. Finished goods ship at 3 pm on weekdays to customers around town. Set prices on the Sales page.'),
           h('li', null, 'Grow: link machines with conveyor belts, add pallet jacks and forklifts, staff up the office, keep a mechanic on hand, research new products, and move to a bigger building when you run out of room.'))),

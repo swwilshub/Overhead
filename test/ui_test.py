@@ -17,6 +17,11 @@ async def no_junk_text(pg, where):
     for src, t in (('text', txt), ('names', names), ('aria', snap)):
         for m in JUNK.finditer(t): hits.append(f'{src}: ...{t[max(0, m.start() - 40):m.end() + 20]!r}')
     ok(not hits, f'no junk text on {where}' + (f': {hits[:4]}' if hits else ''))
+OLD_NAMES = ['Line Worker', 'Account Rep', 'Promotions Specialist', 'Office Assistant', 'Finance Chief', 'Commercial Lead', 'Supply Lead', 'Shift Supervisor', 'Development Engineer', 'Front office', 'Machine shop', 'Furniture shop', 'Plant manager', 'Hand cart', 'Input empty', 'cell cell', 'shop machine', 'arehouse']
+async def old_names_gone(pg, where):
+    txt = await pg.evaluate("() => document.body.innerText + '\\n' + [...document.querySelectorAll('[aria-label],[title]')].map(e => (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('title') || '')).join('\\n')")
+    hits = [w for w in OLD_NAMES if w in txt]
+    ok(not hits, f'no old names on {where}' + (f': {hits}' if hits else ''))
 async def axe_check(pg, where):
     if not await pg.evaluate("() => !!window.axe"): await pg.add_script_tag(content=AXE)
     res = await pg.evaluate("async () => (await axe.run(document, { resultTypes: ['violations'] })).violations.map(v => v.id + ':' + v.nodes.length + ' ' + v.nodes[0].target)")
@@ -66,6 +71,26 @@ async def main():
             if bad: print('VIEW ERROR', v, await pg.locator('.notice').first.inner_text())
             await pg.screenshot(path=str(SHOTS) + f'/v_{v}.png', full_page=True)
             await no_junk_text(pg, f'{v} view')
+        # clearer names: Hiring and Staff tables, the checklist, the In-basket and the memo sender use the new words
+        await pg.click('nav.rail a[href="#hire"]'); await pg.wait_for_timeout(300)
+        jobs = await pg.locator('table:has(th:has-text("Duties")) tbody tr > :first-child').all_inner_texts()
+        want = ['Plant Director', 'Finance Manager', 'Bookkeeper', 'Finance Clerk', 'Sales Manager', 'Sales Rep', 'Marketer', 'Purchasing Manager', 'Materials Buyer', 'Floor Supervisor', 'Machine Operator', 'Chief Engineer', 'Research Engineer', 'Plant Mechanic']
+        ok(sorted(j.strip() for j in jobs) == sorted(want), f'Hiring lists the new job titles: {jobs}')
+        depts = set(await pg.locator('table:has(th:has-text("Duties")) tbody tr td:nth-child(2)').all_inner_texts())
+        ok({'Management', 'Sales', 'Purchasing', 'Finance', 'Production', 'Engineering'} <= {d.strip() for d in depts}, f'Hiring shows the new department names: {depts}')
+        await old_names_gone(pg, 'Hiring'); await axe_check(pg, 'Hiring with new names')
+        await pg.click('nav.rail a[href="#staff"]'); await pg.wait_for_timeout(300)
+        staff = await pg.locator('#main').inner_text()
+        ok('Machine Operator' in staff and 'Sales Rep' in staff and 'Purchasing' in staff, 'Staff page: ' + ' '.join(staff.split())[:140])
+        await old_names_gone(pg, 'Staff'); await axe_check(pg, 'Staff with new names')
+        await pg.click('nav.rail a[href="#inbox"]'); await pg.wait_for_timeout(300)
+        await old_names_gone(pg, 'In-basket')
+        await pg.click('nav.rail a[href="#floor"]'); await pg.wait_for_timeout(300)
+        cl = await pg.locator('#inspector').inner_text()
+        ok('Hire a Machine Operator' in cl and 'Hire a Sales Rep and give them a desk' in cl, 'checklist uses the job titles: ' + ' '.join(cl.split())[:200])
+        eq = await pg.locator('table:has(th:has-text("Status / occupant"))').inner_text()
+        ok(re.search(r'machine #\d+', eq) and 'Machine #' not in eq, 'equipment table uses one machine label: ' + ' '.join(eq.split())[:120])
+        await old_names_gone(pg, 'Factory floor')
         # select a machine, then an empty square: the checklist and Cursor card come back, not "[object HTMLElement]"
         await pg.click('nav.rail a[href="#floor"]'); await pg.wait_for_timeout(300)
         box = await pg.locator('#floor-app canvas').bounding_box()
@@ -75,6 +100,11 @@ async def main():
         mc = await pg.evaluate("() => { const o = window.__overhead.app.st.floor.objects.find(o => o.kind === 'machine'); return [o.id, Math.round(o.x), Math.round(o.y)]; }")
         await click_tile(mc[1], mc[2])
         ok(await sel() == mc[0], 'machine selected by click')
+        panel = await pg.locator('#inspector').inner_text()
+        lab = await pg.evaluate("() => { const {app} = window.__overhead; const o = app.st.floor.objects.find(o => o.kind === 'machine'); return document.querySelector('#inspector h2').textContent; }")
+        ok(re.fullmatch(r'.+ line machine #\d+', lab.strip()) is not None, f'machine panel heading is the one label: {lab}')
+        ok('Operator' in panel and 'Line Worker' not in panel and 'Hire an operator' not in panel, 'machine panel names the Operator')
+        await old_names_gone(pg, 'machine panel'); await axe_check(pg, 'machine panel with new names')
         fw, fh = await pg.evaluate("() => { const f = window.__overhead.app.st.floor; return [f.w, f.h]; }")
         for (tx, ty) in [(fw // 2, fh - 3), (fw - 3, fh - 3), (3, fh - 3), (fw // 2, fh // 2), (fw - 3, 3)]:
             await click_tile(tx, ty)
@@ -95,6 +125,8 @@ async def main():
         await no_junk_text(pg, 'cell editor hatches')
         await pg.click('[data-key="cell-next"]'); await pg.wait_for_timeout(300)
         await pg.click('[data-key="cell-std"]'); await pg.wait_for_timeout(300)
+        ch = (await pg.locator('#cell-ed-h').text_content()).strip()
+        ok(re.fullmatch(r'.+ cell', ch) and 'cell cell' not in ch.lower() and 'line cell' not in ch.lower(), f'cell editor title: {ch}')
         perf = await pg.locator('.cell-metrics').text_content()
         ok('Speed' in perf and 'null' not in perf, 'cell Performance block: ' + ' '.join(perf.split())[-120:])
         await no_junk_text(pg, 'cell editor furnish'); await axe_check(pg, 'cell editor furnish')

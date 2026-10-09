@@ -7,11 +7,11 @@ month by month, run `node test/long.mjs SEED CITY normal`.
 ## The reasonable player
 
 - Leases a building of about 36,000 sq ft. Buys the machine that looks most profitable in that city, making
-  something from bought materials. Paints safety zones, buys a pallet jack, and hires a line worker, an account rep
+  something from bought materials. Paints safety zones, buys a pallet jack, and hires a Machine Operator, a Sales Rep
   and a bookkeeper.
 - Each month, if cash allows, adds the next most promising line it can source (materials, components sold in town,
   or what it already makes). It belts the new machine to any machine that feeds it, and hires an operator.
-- Hires support staff as the plant grows: a mechanic, a buyer, a supervisor, a promotions specialist, a second rep
+- Hires support staff as the plant grows: a mechanic, a Materials Buyer, a Floor Supervisor, a Marketer, a second Sales Rep
   and a second bookkeeper, with offices for them.
 - Takes a three-year loan for a new line once the business has made money for three months.
 - Retools or replaces a line that loses money for three months running.

@@ -40,8 +40,8 @@ export const staff = {
 function deptSummary(st) {
   const d = st.dept, delay = G.accountingDelay(st);
   const items = [
-    ['Finance', st.employees.some(e => hasRole(e, 'finance')) ? (delay > 2 ? pill(`${delay} days behind`, 'warn') : pill('Up to date', 'ok')) : pill('No staff: bills paid late', 'bad')],
-    ['Supply', st.employees.some(e => hasRole(e, 'purchasing')) ? pill(`Can place about ${Math.max(1, Math.round(d.purchCap))} orders a day`, 'ok') : pill('No staff: you place every order', 'warn')],
+    [deptName('finance'), st.employees.some(e => hasRole(e, 'finance')) ? (delay > 2 ? pill(`${delay} days behind`, 'warn') : pill('Up to date', 'ok')) : pill('No staff: bills paid late', 'bad')],
+    [deptName('supply'), st.employees.some(e => hasRole(e, 'purchasing')) ? pill(`Can place about ${Math.max(1, Math.round(d.purchCap))} orders a day`, 'ok') : pill('No staff: you place every order', 'warn')],
     ['Sales effort', h('span', null, meter(d.salesEff / 3, 'Sales effort'), ' ', d.salesEff < 0.5 ? 'Walk-in customers only' : d.salesEff < 1.2 ? 'Modest' : 'Strong')],
     ['Brand awareness', h('span', null, meter(d.awareness, 'Brand awareness'), ' ', pct(d.awareness))],
   ];
