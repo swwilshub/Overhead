@@ -696,11 +696,11 @@ function trackStalls(st, machines, ran, inShift, t, dt) {
     if (!s.sent && s.mins >= STALL_NOTICE_MIN && (s.last == null || t - s.last >= STALL_REPEAT_MIN)) due.push({ o, s, stall });
   }
   if (!due.length) return;
-  const day = dayIndex(t), hour = Math.floor(t / 60), g = mem.group;
+  const day = dayIndex(t), slot = Math.floor(t / 60), g = mem.group; // slot: the game hour a notice falls in
   if (mem.day !== day) { mem.day = day; mem.sent = 0; }
   const entries = due.map(({ o, stall }) => ({ id: o.id, line: stallLine(st, o, stall) }));
   const text = es => es.length === 1 ? { subject: `Machine stopped: ${objectLabel(st, machines.find(m => m.id === es[0].id))}`, body: es[0].line } : { subject: `${es.length} machines stopped`, body: es.map(e => '• ' + e.line).join('\n') };
-  if (g && g.hour === hour && st.memos.some(m => m.id === g.memoId)) {
+  if (g && g.slot === slot && st.memos.some(m => m.id === g.memoId)) {
     // another machine falls due in the hour of the last notice: add it to that memo
     g.entries.push(...entries);
     Object.assign(st.memos.find(m => m.id === g.memoId), text(g.entries), { read: false });
@@ -708,7 +708,7 @@ function trackStalls(st, machines, ran, inShift, t, dt) {
     if (mem.sent >= STALL_MEMOS_PER_DAY) return;
     const urgent = !ran.size && !machines.some(o => o.mode === 'produce' && /Running/.test(o.status || ''));
     const m = memo(st, { from: 'Plant log', ...text(entries), important: urgent });
-    mem.sent++; mem.group = { hour, memoId: m.id, entries };
+    mem.sent++; mem.group = { slot, memoId: m.id, entries };
   }
   for (const { s } of due) { s.sent = true; s.last = t; }
 }

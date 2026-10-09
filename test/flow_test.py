@@ -76,7 +76,8 @@ async def main():
         await pg.set_viewport_size({'width': 400, 'height': 860}); await pg.emulate_media(color_scheme='dark'); await pg.wait_for_timeout(400)
         await pg.screenshot(path=str(SHOTS) + '/f_phone_floor.png')
         sw = await pg.evaluate('document.documentElement.scrollWidth'); print('phone scrollWidth', sw)
-        await pg.click('nav.rail a[href="#staff"]'); await pg.wait_for_timeout(300); await pg.screenshot(path=str(SHOTS) + '/f_phone_staff.png')
+        await pg.click('[data-key="menu"]'); await pg.wait_for_timeout(250)   # at this width the side menu is the Menu button
+        await pg.click('dialog.menu-sheet [data-key="nav-staff"]'); await pg.wait_for_timeout(300); await pg.screenshot(path=str(SHOTS) + '/f_phone_staff.png')
         print('phone scrollWidth staff', await pg.evaluate('document.documentElement.scrollWidth'))
         await pg.set_viewport_size({'width': 1280, 'height': 900}); await pg.click('nav.rail a[href="#city"]'); await pg.wait_for_timeout(300); await pg.screenshot(path=str(SHOTS) + '/f_dark_city.png')
         await pg.click('nav.rail a[href="#floor"]'); await pg.wait_for_timeout(300); await pg.screenshot(path=str(SHOTS) + '/f_dark_floor.png')

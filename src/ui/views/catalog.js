@@ -247,6 +247,7 @@ let ro = null;
 let raf = 0;
 export function mounted() {
   cancelAnimationFrame(raf);
+  document.querySelector('.cat-tabs [aria-selected="true"]')?.scrollIntoView({ inline: 'center', block: 'nearest' }); // the tabs are one scrolling row on a phone
   for (const cv of document.querySelectorAll('.cat-canvas')) drawMachinePreview(cv, reducedMotion() ? 0 : 1);
   for (const cv of document.querySelectorAll('.range-sprite')) drawRangeSprite(cv);
   // the preview runs its tool head (not with reduced motion)

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Overhead</title>
 <meta name="description" content="Overhead is a 90s-style factory management sim. Lease a plant in an American city, buy machines, hire a crew, buy materials and sell what you make. Fully playable with a keyboard and a screen reader.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -97,14 +97,17 @@ nav.rail a:hover { background: var(--panel) }
 nav.rail a[aria-current="page"] { background: var(--accent); color: var(--accent-ink) }
 nav.rail .badge { background: var(--hazard); color: var(--hazard-ink); border-radius: 999px; padding: 0 8px; font-size: 0.8rem; font-family: var(--font-mono) }
 nav.rail .group { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); padding: 12px 10px 4px }
-main { overflow: auto; padding-block: 20px 60px; padding-inline: 24px; min-width: 0 }
+main { --pad-b: 60px; overflow: auto; padding-block: 20px var(--pad-b); padding-inline: 24px; min-width: 0; position: relative }
 .view-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 16px }
 .view-head p { color: var(--muted) }
 section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0 }
 section.card > h2, section.card > h3 { margin-bottom: 10px }
-.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0 }
-.kv dt { color: var(--muted) } .kv dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums }
-.table-wrap { overflow-x: auto; max-width: 100% }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; margin: 0 }
+.kv dt { color: var(--muted) } .kv dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere }
+.grid2.split-inbox { grid-template-columns: minmax(min(100%, 320px), 1fr) minmax(min(100%, 320px), 1.3fr); align-items: start }
+.grid2.split-city { grid-template-columns: minmax(0, auto) minmax(min(100%, 300px), 1fr); align-items: start }
+.grid2.split-nation { grid-template-columns: minmax(0, 2fr) minmax(min(100%, 300px), 1fr); align-items: start }
+.table-wrap { overflow-x: auto; max-width: 100%; position: relative } /* positioned, so screen-reader-only text inside is clipped with the table instead of widening the page */
 table { border-collapse: collapse; width: 100%; font-size: var(--step--1) }
 caption { text-align: left; font-weight: 700; padding-bottom: 6px }
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top }
@@ -284,6 +287,106 @@ dialog .dlg-actions { display: flex; flex-wrap: wrap; justify-content: flex-end;
   .toasts .toast:nth-last-child(n+3) { display: none }
   .floor-layout { grid-template-columns: 1fr }
   .status { padding-inline: 16px } .status .run { margin-left: 0 }
+}
+/* phones (specs 007 to 009): a slim top bar, a bottom bar and a Menu sheet */
+.tabbar ul { list-style: none; margin: 0; padding: 0; display: flex }
+.tabbar li { flex: 1 1 0; display: flex; min-width: 0 }
+.tabbar a, .tabbar button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 56px; padding: 6px 4px; border: 0; border-radius: 0; background: transparent; color: var(--ink); font: inherit; font-size: 0.85rem; font-weight: 700; text-decoration: none; text-align: center; line-height: 1.15 }
+.tabbar a[aria-current="page"] { background: var(--accent); color: var(--accent-ink) }
+.tabbar .badge, .menu-sheet .badge { background: var(--hazard); color: var(--hazard-ink); border-radius: 999px; padding: 0 8px; font-size: 0.8rem; font-family: var(--font-mono) }
+dialog.menu-sheet { margin: auto 0 0; width: 100%; max-width: none; max-height: 88vh; max-height: 88dvh; border-radius: 16px 16px 0 0; border-bottom: 0; overflow: hidden }
+dialog.menu-sheet .dlg { position: relative; gap: 10px; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; max-height: 88vh; max-height: 88dvh; overscroll-behavior: contain }
+.menu-close { position: absolute; top: 10px; right: 12px; min-height: 44px; min-width: 64px }
+.menu-facts { display: flex; flex-wrap: wrap; gap: 4px 28px; margin: 0 }
+.menu-facts dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted) }
+.menu-facts dd { margin: 0; font-family: var(--font-mono); font-weight: 600 }
+.menu-tools button { min-height: 48px }
+.menu-group h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 10px 0 2px }
+.menu-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px }
+.menu-group .menu-link { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 48px; padding: 0 12px; border: 0; border-radius: var(--radius); background: transparent; color: var(--ink); font: inherit; font-weight: 700; text-align: left }
+.menu-group .menu-link[aria-current="page"] { background: var(--accent); color: var(--accent-ink) }
+@media (max-width: 700px), (max-height: 500px) {
+  #app { height: 100vh; height: 100dvh }
+  .status.compact { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "brand cash alert" "clock run run"; align-items: center; gap: 2px 10px; padding: 6px max(12px, env(safe-area-inset-right, 0px)) 6px max(12px, env(safe-area-inset-left, 0px)) }
+  .status.compact .brand { grid-area: brand; min-width: 0; font-size: var(--step-0) }
+  .status.compact .brand-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .status.compact .cash { grid-area: cash }
+  .status.compact #st-alert { grid-area: alert } .status.compact #st-alert:empty { display: none }
+  .status.compact .clock { grid-area: clock; font-size: 0.78rem }
+  .status.compact .run { grid-area: run; margin-left: 0; flex-wrap: nowrap }
+  .status.compact .run button { min-width: 44px; min-height: 44px; padding: 0 8px }
+  .status.compact .alert { min-height: 44px; padding: 4px 12px }
+  .grid2.split-inbox, .grid2.split-city, .grid2.split-nation { grid-template-columns: minmax(0, 1fr) }
+  .pill { white-space: normal }
+  .body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto }
+  main { --pad-b: 20px; padding-block: 12px var(--pad-b); padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px)) }
+  main { grid-row: 1 } .tabbar { grid-row: 2; border-top: 1px solid var(--line); background: var(--panel-2); padding-bottom: env(safe-area-inset-bottom, 0px) }
+}
+/* touch (spec 006): the floor's own gestures, a placement bar, and finger-sized floor buttons */
+.place-bar { position: sticky; bottom: calc(-1 * var(--pad-b)); z-index: 6; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 -4px 16px rgb(0 0 0 / 0.2) }
+.place-what { font-weight: 700 }
+.place-bar button { min-height: 48px; min-width: 88px }
+.zoom-group { display: inline-flex; align-items: center; gap: 6px }
+@media (pointer: coarse) { .floor-tools button, .floor-tools select { min-height: 44px; min-width: 44px } }
+@media (max-width: 700px), (max-height: 500px) {
+  /* dialogs are sheets at the bottom of the screen, buttons full width (spec 008) */
+  dialog { margin: auto 0 0; width: 100% !important; max-width: none; max-height: 85vh; max-height: 85dvh; border-radius: 16px 16px 0 0; border-bottom: 0; overflow: hidden }
+  dialog .dlg { padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; max-height: 85vh; max-height: 85dvh; overscroll-behavior: contain }
+  dialog .dlg-actions { flex-direction: column; align-items: stretch }
+  dialog .dlg-actions button { min-height: 48px; width: 100% }
+  /* the selected item's panel is a sheet over the floor; with nothing selected it stays under it */
+  #inspector.sheet { position: sticky; bottom: calc(-1 * var(--pad-b)); z-index: 6; max-height: 50vh; max-height: min(50dvh, 420px); overflow-y: auto; overscroll-behavior: contain; margin-inline: -12px; padding: 10px 12px 12px; background: var(--bg); border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgb(0 0 0 / 0.25) }
+  #inspector.sheet .card { border: 0; padding: 4px 0; gap: 6px }
+  #inspector .sheet-actions { display: flex; justify-content: flex-end; gap: 8px }
+  #inspector .sheet-actions button { min-height: 44px; min-width: 76px }
+  /* collapsed: name, the buttons and the status line only */
+  #inspector.sheet:not(.open) .card > :not(h2):not(.sheet-actions):not(p:first-of-type) { display: none }
+  /* the floor page gives its height to the plant: the address line stays for screen readers only */
+  .floor-page h1 { font-size: var(--step-2) }
+  .floor-page .view-head p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+  /* toasts sit under the top bar and never hide the bottom bar or the thumbs */
+  .toasts { top: calc(env(safe-area-inset-top, 0px) + 100px); bottom: auto; left: 12px; right: 12px; max-width: none }
+}
+@media (max-width: 700px), (max-height: 500px) {
+  /* tables become lists of cards (spec 009); dom.js writes the roles and each cell's column name */
+  .table-wrap table, .table-wrap thead, .table-wrap tbody, .table-wrap tr, .table-wrap td, .table-wrap th { display: block }
+  .table-wrap thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+  .table-wrap tr { padding: 8px 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2) }
+  .table-wrap td, .table-wrap th[scope="row"] { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 5px 0; border: 0; text-align: right; overflow-wrap: anywhere }
+  .table-wrap td::before { content: attr(data-label); flex: none; max-width: 45%; color: var(--muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; text-align: left }
+  .table-wrap td[data-label=""] { justify-content: flex-end; flex-wrap: wrap }
+  .table-wrap td[data-label=""]::before { content: none }
+  .table-wrap th[scope="row"] { justify-content: flex-start; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-weight: 800; text-align: left }
+  .table-wrap td[colspan] { display: block; text-align: left }
+  .sort-menu { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 700 }
+  .sort-menu select { flex: 1 1 200px }
+  .nation svg { max-height: none }
+  /* the Catalog's tabs are one row that scrolls sideways, with a fade where there is more */
+  .cat-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent) }
+  .cat-tabs::-webkit-scrollbar { display: none }
+  .cat-tabs [role=tab] { flex: none }
+}
+/* finger-sized targets on touch screens, at any width (spec 009) */
+@media (pointer: coarse) {
+  button, .btn, select, summary, [role=tab], input:not([type=checkbox]):not([type=radio]) { min-height: 44px }
+  button:not(.link):not(.sort) { min-width: 44px }
+  .link, .sort { position: relative }
+  .link::after, .sort::after { content: ""; position: absolute; inset: -12px -8px }
+  label:has(> input[type=checkbox]), label:has(> input[type=radio]) { display: flex; align-items: center; gap: 10px; min-height: 44px }
+  /* checkboxes and radios are drawn here, 44 px square, because a native one cannot be made a finger-sized target */
+  input[type=checkbox], input[type=radio] { -webkit-appearance: none; appearance: none; display: inline-grid; place-content: center; flex: none; width: 44px; height: 44px; margin: 0; border: 2px solid var(--muted); border-radius: 10px; background: var(--panel) }
+  input[type=radio] { border-radius: 50% }
+  input[type=checkbox]:checked { background: var(--accent); border-color: var(--accent) }
+  input[type=checkbox]:checked::after { content: ""; width: 11px; height: 22px; margin-top: -4px; border: solid var(--accent-ink); border-width: 0 4px 4px 0; transform: rotate(45deg) }
+  input[type=radio]:checked { border-color: var(--accent) }
+  input[type=radio]:checked::after { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--accent) }
+  input[type=checkbox]:disabled, input[type=radio]:disabled { opacity: 0.5 }
+  .lot { width: 44px; height: 44px }
+}
+@media (min-width: 701px) and (max-height: 500px) {
+  .status.compact { grid-template-columns: minmax(0, 1fr) auto auto auto auto; grid-template-areas: "brand cash alert clock run"; gap: 2px 16px }
+  .tabbar a, .tabbar button { min-height: 44px }
+  .toasts { top: 64px }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
 </style>

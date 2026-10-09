@@ -4,6 +4,22 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- Phone layout, part 4: every page fits. Tables become lists of cards, each value labelled with its column, with a Sort
+  by menu in place of the column headers (screen readers still hear a table). The Nation page shows the map full width
+  above the city card and you pick a city from the list. The Catalog's tabs are one row you can swipe. On touch
+  screens buttons, tabs, links, sliders, checkboxes and the city map's buildings are all at least finger-sized.
+- Phone layout, part 3: the floor works with a finger. Drag to look around, pinch to zoom (a quarter to four times),
+  tap a machine to select it, and use Fit to see the whole plant. Painting zones and laying conveyor still work by
+  dragging. When you place or move something, the outline follows your finger and nothing is bought until you press
+  **Place here**; **Rotate** and **Cancel** sit beside it. The floor stays where you scrolled it, zoom buttons are
+  finger-sized, and on a phone the plant starts fitted to the screen.
+- Phone layout, part 2. Questions pop up as a sheet at the bottom of the screen with big full-width buttons. Tapping a
+  machine opens a short sheet with its name and status, with Details for the rest and Close to dismiss it, so the plant
+  stays in view. Messages now show under the top bar instead of over the bottom bar.
+- Phone layout, part 1. On a phone the top bar is slim (company, money, the clock and four big speed buttons), a
+  bottom bar has Floor, Staff, In-basket and Menu, and Menu opens a sheet with every section, net worth, city, Run
+  until… and Sound. In landscape the bars shrink to leave room for the plant. Nothing on a phone scrolls sideways any
+  more: wide tables no longer make the whole page zoom out, and Staff, In-basket, City and Nation fit one column.
 - You are told when a machine stops. A machine with nothing left to work on reads **Out of materials** (stock that is
   still on its way reads "Waiting for materials"), and one whose output has nowhere to go reads "Output blocked". After
   30 minutes of working time the Plant log sends one memo with the reason and what to do, at most three a day. Needs

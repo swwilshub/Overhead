@@ -1,5 +1,6 @@
 // App shell: status bar, navigation, the run loop, refresh with focus preservation.
 import { h, frag, announce, prefs, dialog, confirmBox, captureFocus, restoreFocus } from './dom.js';
+import { isCompact, COMPACT_QUERY, compactMq } from './compact.js';
 import * as G from '../sim/game.js';
 import { fmtDate, fmtTime, money, moneyShort, minuteOfDay, isWorkday, MIN_PER_DAY, monthKey, weekday } from '../core/util.js';
 import { WORK_START, WORK_END, isWhite } from '../sim/people.js';
@@ -18,6 +19,9 @@ export const NAV = [
   ['Market', [['city', 'City map'], ['nation', 'Nation']]],
   ['Game', [['options', 'Options & help']]],
 ];
+// Phones, in portrait and landscape: a slim top bar, a bottom bar and a Menu sheet replace the side menu (spec 007).
+export { isCompact, COMPACT_QUERY };
+compactMq.addEventListener('change', () => { closeMenu(); render({}); });
 const NAV_KEYS = { f: 'floor', c: 'catalog', d: 'research', s: 'staff', h: 'hire', i: 'inbox', p: 'purchasing', l: 'sales', b: 'bank', r: 'reports', m: 'city', n: 'nation', o: 'options' };
 
 export function registerView(name, mod) { app.views[name] = mod; }
@@ -85,10 +89,19 @@ export function refresh(force = false) {
 
 // ---- status bar
 function statusBar() {
-  const st = app.st;
-  const bar = h('header', { class: 'status', 'aria-label': 'Company status' },
-    h('div', { class: 'brand' }, h('span', { class: 'stripe', 'aria-hidden': 'true' }), st ? st.setup.company : 'Overhead'));
+  const st = app.st, compact = isCompact();
+  const bar = h('header', { class: 'status' + (compact ? ' compact' : ''), 'aria-label': 'Company status' },
+    h('div', { class: 'brand' }, h('span', { class: 'stripe', 'aria-hidden': 'true' }), h('span', { class: 'brand-name' }, st ? st.setup.company : 'Overhead')));
   if (!st) return bar;
+  // compact: money, issues, the clock and the speed buttons; net worth, city, Run until and Sound live in the Menu
+  if (compact) {
+    bar.append(frag(
+      h('div', { class: 'fig cash' }, h('span', null, 'Checking'), h('span', { id: 'st-cash' }, money(st.bank.checking))),
+      alertSlot(),
+      h('div', { class: 'clock', id: 'st-clock', 'aria-label': 'Game date and time' }, clockText()),
+      inGame() ? runControls(true) : null));
+    return bar;
+  }
   bar.append(frag(
     h('div', { class: 'clock', id: 'st-clock', 'aria-label': 'Game date and time' }, clockText()),
     h('div', { class: 'figs' },
@@ -113,11 +126,14 @@ function clockText() {
   return [h('div', null, fmtDate(st.time)), h('div', null, `${fmtTime(st.time)} · ${shift}`)];
 }
 const SPEEDS = [['Pause', 0], ['Play', 1], ['Fast', 2], ['Faster', 3]];
-function runControls() {
+const SPEED_ICON = { Pause: '❚❚', Play: '▶', Fast: '▶▶', Faster: '▶▶▶' };
+function muteButton() {
+  return h('button', { type: 'button', 'data-key': 'mute', 'aria-pressed': String(!prefs.sfx), 'aria-label': 'Mute sound', title: 'Mute sound', onclick: e => { prefs.sfx = !prefs.sfx; applyPrefs(); e.currentTarget.setAttribute('aria-pressed', String(!prefs.sfx)); e.currentTarget.textContent = prefs.sfx ? '♪ Sound' : '♪ Muted'; updateAmbience(); if (prefs.sfx) sfx('ok'); announce(prefs.sfx ? 'Sound on.' : 'Sound muted.', 'polite', false); } }, prefs.sfx ? '♪ Sound' : '♪ Muted');
+}
+function runControls(compact = false) {
   return h('div', { class: 'run', role: 'group', 'aria-label': 'Clock' },
-    SPEEDS.map(([label, s]) => h('button', { type: 'button', 'data-key': 'speed-' + s, 'aria-pressed': String(app.speed === s && !app.runTo), onclick: () => setSpeed(s) }, label)),
-    h('button', { type: 'button', 'data-key': 'runto', onclick: runToMenu, 'aria-haspopup': 'dialog' }, 'Run until…'),
-    h('button', { type: 'button', 'data-key': 'mute', 'aria-pressed': String(!prefs.sfx), 'aria-label': 'Mute sound', title: 'Mute sound', onclick: e => { prefs.sfx = !prefs.sfx; applyPrefs(); e.currentTarget.setAttribute('aria-pressed', String(!prefs.sfx)); e.currentTarget.textContent = prefs.sfx ? '♪ Sound' : '♪ Muted'; updateAmbience(); if (prefs.sfx) sfx('ok'); announce(prefs.sfx ? 'Sound on.' : 'Sound muted.', 'polite', false); } }, prefs.sfx ? '♪ Sound' : '♪ Muted'));
+    SPEEDS.map(([label, s]) => h('button', { type: 'button', 'data-key': 'speed-' + s, 'aria-pressed': String(app.speed === s && !app.runTo), onclick: () => setSpeed(s), ...(compact ? { 'aria-label': label, title: label } : {}) }, compact ? SPEED_ICON[label] : label)),
+    compact ? null : [h('button', { type: 'button', 'data-key': 'runto', onclick: runToMenu, 'aria-haspopup': 'dialog' }, 'Run until…'), muteButton()]);
 }
 export function setSpeed(s) {
   const was = app.speed; app.speed = s; app.runTo = null;
@@ -154,7 +170,7 @@ function updateStatus() {
         // the last issue is fixed: if the button has focus, hand it to its neighbour in the bar instead of the page body
         const had = btn && document.activeElement === btn;
         al.replaceChildren();
-        if (had) document.querySelector('.status [data-key="mute"], .status [data-key="runto"]')?.focus({ preventScroll: true });
+        if (had) document.querySelector('.status [data-key="mute"], .status [data-key="runto"], .status [data-key="speed-3"]')?.focus({ preventScroll: true });
       }
     }
   }
@@ -162,7 +178,8 @@ function updateStatus() {
 }
 function updateNavBadges() {
   const st = app.st; if (!st) return;
-  const b = document.getElementById('badge-inbox'); if (b) { const n = st.memos.filter(m => !m.read).length; b.textContent = n ? String(n) : ''; b.hidden = !n; b.setAttribute('aria-label', `${n} unread`); }
+  const n = st.memos.filter(m => !m.read).length;
+  for (const b of document.querySelectorAll('[data-badge="inbox"]')) { b.textContent = n ? String(n) : ''; b.hidden = !n; b.setAttribute('aria-label', `${n} unread`); }
 }
 export function setupProblems(st) {
   if (!st || st.phase !== 'play') return [];
@@ -184,7 +201,31 @@ export function setupProblems(st) {
   return out;
 }
 
+const unread = () => app.st ? app.st.memos.filter(m => !m.read).length : 0;
+const inboxBadge = () => h('span', { class: 'badge', 'data-badge': 'inbox', hidden: !unread() }, String(unread() || ''));
+// Compact screens: four big buttons along the bottom. Before a game starts they are the same few links the side menu has.
+function tabBar() {
+  const play = app.st && app.st.phase === 'play';
+  const link = (view, label, extra) => h('li', null, h('a', { href: '#' + view, 'data-key': 'tab-' + view, 'aria-current': app.view === view ? 'page' : null, onclick: e => { e.preventDefault(); go(view); } }, h('span', null, label), extra));
+  if (!play) return h('nav', { class: 'tabbar', 'aria-label': 'Game' }, h('ul', null,
+    link('start', 'Title screen'), app.st ? link('nation', 'Choose a city') : null, app.st?.city ? link('city', 'Choose a building') : null, link('options', 'Options & help')));
+  return h('nav', { class: 'tabbar', 'aria-label': 'Main' }, h('ul', null,
+    link('floor', 'Floor'), link('staff', 'Staff'), link('inbox', 'In-basket', inboxBadge()),
+    h('li', null, h('button', { type: 'button', 'data-key': 'menu', 'aria-haspopup': 'dialog', onclick: openMenu }, 'Menu'))));
+}
+const closeMenu = () => document.querySelector('dialog.menu-sheet')?.dispatchEvent(new Event('cancel'));
+// The Menu: every section of the game, plus what the slim top bar leaves out. A modal dialog, so focus is held in it,
+// Escape closes it and focus returns to the Menu button; a tap on the dimmed screen above it closes it too.
+function openMenu() {
+  const st = app.st; if (!st || st.phase !== 'play') return;
+  const sections = h('nav', { 'aria-label': 'Departments' }, NAV.map(([group, items]) => h('section', { class: 'menu-group' }, h('h3', null, group),
+    h('ul', null, items.map(([k, label]) => h('li', null, h('button', { type: 'button', class: 'menu-link', 'data-key': 'nav-' + k, 'aria-current': app.view === k ? 'page' : null, onclick: () => { closeMenu(); go(k); } }, h('span', null, label), k === 'inbox' ? inboxBadge() : null)))))));
+  const facts = h('dl', { class: 'menu-facts' }, h('div', null, h('dt', null, 'Net worth'), h('dd', null, moneyShort(G.netWorth(st)))), st.city ? h('div', null, h('dt', null, 'City'), h('dd', null, st.city.name)) : null);
+  const tools = h('div', { class: 'row menu-tools' }, h('button', { type: 'button', 'data-key': 'runto', 'aria-haspopup': 'dialog', onclick: () => { closeMenu(); runToMenu(); } }, 'Run until…'), muteButton());
+  dialog('Menu', frag(h('button', { type: 'button', class: 'menu-close', 'data-key': 'menu-close', onclick: closeMenu }, 'Close'), facts, tools, sections), [], { cls: 'menu-sheet', backdrop: true });
+}
 function navRail() {
+  if (isCompact()) return tabBar();
   if (!app.st || app.st.phase !== 'play') {
     return h('nav', { class: 'rail', 'aria-label': 'Game' }, h('ul', null,
       h('li', null, h('a', { href: '#', 'aria-current': app.view === 'start' ? 'page' : null, onclick: e => { e.preventDefault(); go('start'); } }, 'Title screen')),
@@ -195,7 +236,7 @@ function navRail() {
   return h('nav', { class: 'rail', 'aria-label': 'Departments' }, h('ul', null, NAV.map(([group, items]) => [
     h('li', { class: 'group', 'aria-hidden': 'true' }, group),
     items.map(([k, label]) => h('li', null, h('a', { href: '#' + k, 'data-key': 'nav-' + k, 'aria-current': app.view === k ? 'page' : null, onclick: e => { e.preventDefault(); go(k); } }, label,
-      k === 'inbox' ? h('span', { class: 'badge', id: 'badge-inbox', hidden: !app.st.memos.some(m => !m.read) }, String(app.st.memos.filter(m => !m.read).length || '')) : null)))])));
+      k === 'inbox' ? h('span', { class: 'badge', id: 'badge-inbox', 'data-badge': 'inbox', hidden: !app.st.memos.some(m => !m.read) }, String(app.st.memos.filter(m => !m.read).length || '')) : null)))])));
 }
 
 // ---- the clock loop
