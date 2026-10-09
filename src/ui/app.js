@@ -80,7 +80,7 @@ export function refresh(force = false) {
   if (!force && now - app.lastRefresh < 1000) return;
   const ae = document.activeElement;
   const typing = ae && ae.closest('main') && (ae.matches('input:not([type=checkbox]):not([type=radio]):not([type=button]),select,textarea'));
-  if (typing && !force) { updateStatus(); return; }
+  if ((typing || document.body.dataset.stepping || ae?.closest?.('.stepper')) && !force) { updateStatus(); return; }
   if (document.querySelector('dialog[open]')) { updateStatus(); return; }
   const v = app.views[app.view];
   if (v?.patch && !force) { v.patch(app); app.lastRefresh = now; updateNavBadges(); return; }

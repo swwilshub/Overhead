@@ -43,8 +43,15 @@ The one-screen work is sprint 4.
 | 012 | **Profile cards:** one card per person with the three-dot line, in a carousel; a reusable carousel. | 4 | M | 1, 4 | review | Sam; F-3 |
 | 013 | **Balance for seniority:** pay, skill and experience numbers that keep the 24-month bands. | 4 | S | 3 | review | economy |
 
-Sprint 4 (planned): the page-and-swipe pattern and every section split into pages that fit 390 × 844, 360 × 740 and
-landscape (F-1, F-3, F-4, F-5).
+Sprint 5 (planned, moved from 4): the page-and-swipe pattern and every section split into pages that fit 390 × 844,
+360 × 740 and landscape (F-1, F-3, F-4, F-5).
+
+## Sprint 4 (Sam, 2026-10-09: "remove all manual text entry unless it's really needed … numbers first")
+
+| Spec | Item | Impact | Effort | Pillars | Status | Evidence |
+|---|---|---|---|---|---|---|
+| 014 | **Numbers by touch:** a stepper control (buttons, chips, slider) replaces every typed number: salary offer, order boxes, purchasing targets, sales prices, bank amounts, scenario number. | 5 | M | 1, 4 | review | Sam; audit in the spec |
+| — | **Names without typing** (company and player name): proposed for the next spec, needs Sam's call. | 3 | S | 4 | new | Sam |
 
 ## Full backlog
 

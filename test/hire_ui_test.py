@@ -58,7 +58,7 @@ async def main():
         seeking = await pg.locator('dialog[open]').inner_text()
         ok(re.search(r'Seeking\s+(Junior|Senior) Operator|Seeking\s+Operations Director', seeking) is not None, 'the resume dialog names the level')
         before = await pg.evaluate(f"() => {O}.app.st.employees.length")
-        await pg.fill('#salary-offer', '99999'); await pg.click('dialog[open] button.primary'); await pg.wait_for_timeout(400)
+        await pg.click('dialog[open] .chip:has-text("Ask +5%")'); await pg.click('dialog[open] button.primary'); await pg.wait_for_timeout(400)
         ok(await pg.evaluate(f"() => {O}.app.st.employees.length") == before + 1, 'Make offer hires them')
         await axe_check(pg, 'Hiring')
         ok(not errs, f'no page errors {errs[:2]}')

@@ -1,6 +1,10 @@
 import asyncio
 import sys, os; sys.path.insert(0, os.path.dirname(__file__)); from env import URL, AXE, SHOTS, launch_opts
 from playwright.async_api import async_playwright
+async def set_seed(pg, n):
+    await pg.focus('[data-key="seed"]')
+    for _ in range(n // 100): await pg.keyboard.press('PageUp')
+    for _ in range(n % 100): await pg.keyboard.press('ArrowUp')
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch(**launch_opts())
@@ -11,7 +15,7 @@ async def main():
         async def live(): return (await pg.locator('#live-polite').inner_text()) + ' || ' + (await pg.locator('#live-assertive').inner_text())
         await pg.goto(URL); await pg.wait_for_timeout(800)
         # new game via the form
-        await pg.fill('#ng-company', 'Test Works'); await pg.check('#ng-scen-angel'); await pg.fill('#ng-seed', '42')
+        await pg.fill('#ng-company', 'Test Works'); await pg.check('#ng-scen-angel'); await set_seed(pg, 42)
         await pg.click('text=Found the company'); await pg.wait_for_timeout(400)
         print('view after found:', await pg.locator('h1').first.inner_text())
         # choose Denver via keyboard on the map
@@ -64,7 +68,7 @@ async def main():
             await pg.locator('[data-key^="buy-"]').first.click(); await pg.wait_for_timeout(200)
             await pg.click('dialog button:has-text("Place order")'); await pg.wait_for_timeout(200); print('order:', await live())
         # bank loan
-        await pg.click('nav.rail a[href="#bank"]'); await pg.fill('#loan-amt', '50000'); await pg.click('text=Apply for loan'); await pg.click('dialog button:has-text("Borrow")'); await pg.wait_for_timeout(200); print('loan:', await live())
+        await pg.click('nav.rail a[href="#bank"]'); await pg.focus('[data-key="loan-amt"]'); [await pg.keyboard.press('Home')] and [await pg.keyboard.press('PageUp') for _ in range(4)] and [await pg.keyboard.press('ArrowUp') for _ in range(5)]; await pg.click('text=Apply for loan'); await pg.click('dialog button:has-text("Borrow")'); await pg.wait_for_timeout(200); print('loan:', await live())
         # save to slot 1 and reload it
         await pg.click('nav.rail a[href="#options"]'); await pg.click('text=Save to slot 1'); await pg.wait_for_timeout(800); print('save:', await live())
         await pg.screenshot(path=str(SHOTS) + '/f_options.png', full_page=True)

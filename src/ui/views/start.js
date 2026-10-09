@@ -1,4 +1,4 @@
-import { h, field, table, announce, confirmBox } from '../dom.js';
+import { h, field, table, announce, confirmBox, stepper } from '../dom.js';
 import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
 import { CITIES, ECONOMY, FAMILIES, ITEM_ID, ITEMS, RECIPES } from '../../gen/data.js';
@@ -46,7 +46,8 @@ function newGameForm() {
   const company = h('input', { id: 'ng-company', value: 'Keystone Manufacturing', maxlength: 40, autocomplete: 'off' });
   const owner = h('input', { id: 'ng-owner', value: '', maxlength: 40, autocomplete: 'off', placeholder: 'Optional' });
   const diff = h('select', { id: 'ng-diff' }, h('option', { value: 'easy' }, 'Relaxed: more demand, slightly cheaper'), h('option', { value: 'normal', selected: true }, 'Standard'), h('option', { value: 'hard' }, 'Cutthroat: less demand, pricier'));
-  const seed = h('input', { id: 'ng-seed', inputmode: 'numeric', maxlength: 12, autocomplete: 'off' });
+  const seed = stepper({ label: 'Scenario number', value: 0, min: 0, max: 99999, step: 1, big: 100, key: 'seed', format: n => n ? String(n) : 'Random' });
+  const roll = h('button', { type: 'button', 'data-key': 'seed-roll', onclick: () => seed.stepperSet(1 + Math.floor(Math.random() * 99999)) }, 'Roll a number');
   const sandbox = h('input', { type: 'checkbox', id: 'ng-sandbox' });
   const scen = Object.entries(G.SCENARIOS).map(([k, s], i) => h('div', { class: 'row', style: { alignItems: 'flex-start', flexWrap: 'nowrap' } },
     h('input', { type: 'radio', name: 'ng-scen', id: 'ng-scen-' + k, value: k, checked: i === 0 }),
@@ -54,13 +55,13 @@ function newGameForm() {
   const form = h('form', { class: 'stack', onsubmit: e => {
     e.preventDefault();
     const sc = form.querySelector('input[name=ng-scen]:checked').value;
-    app.st = G.newGame({ company: company.value.trim() || 'Keystone Manufacturing', owner: owner.value.trim(), scenario: sc, difficulty: diff.value, seed: seed.value.trim(), sandbox: sandbox.checked });
+    app.st = G.newGame({ company: company.value.trim() || 'Keystone Manufacturing', owner: owner.value.trim(), scenario: sc, difficulty: diff.value, seed: seed.stepperValue() ? String(seed.stepperValue()) : '', sandbox: sandbox.checked });
     sfx('fanfare'); announce(`${app.st.setup.company} is founded. Choose a city.`);
     go('nation');
   } },
     h('div', { class: 'grid2' }, field('Company name', company), field('Your name', owner)),
     h('fieldset', { class: 'stack', style: { border: '1px solid var(--line)', borderRadius: '8px', padding: '12px' } }, h('legend', { style: { fontWeight: 700 } }, 'Starting money'), scen),
-    h('div', { class: 'grid2' }, field('Difficulty', diff), field('Scenario number', seed, 'Optional. The same number always builds the same cities and markets.')),
+    h('div', { class: 'grid2' }, field('Difficulty', diff), h('div', { class: 'stack', style: { gap: '4px' } }, h('strong', null, 'Scenario number'), seed, roll, h('span', { class: 'muted', style: { fontSize: '0.85rem' } }, 'Random unless you pick one. The same number always builds the same cities and markets.'))),
     h('div', { class: 'row' }, sandbox, h('label', { for: 'ng-sandbox', style: { fontWeight: 400 } }, 'Practice mode: start with $5,000,000 (scores are not posted)')),
     h('div', { class: 'row' }, h('button', { class: 'primary', type: 'submit' }, 'Found the company')));
   return h('section', { class: 'card', id: 'new-game', 'aria-labelledby': 'ng-h' }, h('h2', { id: 'ng-h' }, 'New company'), form);

@@ -101,3 +101,16 @@ Newest first. Each entry: date, decision, reason.
   and Staff (1.9 to 1.0), but every other section is as tall as it was. Reason: Sam chose staff first; the pager is
   sprint 4.
 
+- **2026-10-09 — Numbers are set by a stepper, never typed.** One control (`stepper` in `dom.js`) is used for the
+  salary offer, order size, purchasing targets, sales prices, bank amounts, loans and the scenario number. Reason: Sam
+  asked to remove manual entry unless it is really needed, starting with numbers; on a phone a number box brings up the
+  keyboard over the page. A test fails if a number box comes back.
+- **2026-10-09 — A page does not redraw under a focused stepper.** Same rule as typing. A change redraws the page half a
+  second after the last step, so figures that depend on it (a price's "vs market") catch up. Reason: a redraw replaces the
+  button being held.
+- **2026-10-09 — An order stops at what the vendor has left.** The Boxes stepper's maximum follows the chosen vendor's
+  monthly supply and the room in storage. Reason: the old number box accepted any number and the game quietly ordered
+  fewer, with the message after the fact.
+- **2026-10-09 — Purchasing targets are merged at the moment of change.** The old handler spread a copy of the targets
+  taken when the page was drawn, so by reading it two rows changed before the next redraw could drop the first edit (I
+  did not reproduce this; it was a risk seen while reading the code). The stepper reads the targets when it changes.
