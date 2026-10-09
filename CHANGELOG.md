@@ -4,6 +4,10 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- Phone layout, part 1. On a phone the top bar is slim (company, money, the clock and four big speed buttons), a
+  bottom bar has Floor, Staff, In-basket and Menu, and Menu opens a sheet with every section, net worth, city, Run
+  until… and Sound. In landscape the bars shrink to leave room for the plant. Nothing on a phone scrolls sideways any
+  more: wide tables no longer make the whole page zoom out, and Staff, In-basket, City and Nation fit one column.
 - You are told when a machine stops. A machine with nothing left to work on reads **Out of materials** (stock that is
   still on its way reads "Waiting for materials"), and one whose output has nowhere to go reads "Output blocked". After
   30 minutes of working time the Plant log sends one memo with the reason and what to do, at most three a day. Needs

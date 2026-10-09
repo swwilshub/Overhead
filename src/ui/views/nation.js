@@ -34,7 +34,7 @@ export function render() {
     g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickIt(); } });
     svg.append(g);
   }
-  wrap.append(h('div', { class: 'grid2', style: { gridTemplateColumns: 'minmax(0, 2fr) minmax(min(100%, 300px), 1fr)', alignItems: 'start' } },
+  wrap.append(h('div', { class: 'grid2 split-nation' },
     h('div', { class: 'card', style: { padding: '8px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '10px' } }, svg),
     infoCard(v.sel, playing)));
   const rows = CITIES.map(c => ({ ...c, ...cityStats(c.id) }));

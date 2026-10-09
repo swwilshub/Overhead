@@ -75,7 +75,7 @@ export function render() {
     h('div', { class: 'view-head' }, h('div', null, h('h1', null, playing ? `${city.name}` : `Lease a building in ${city.name}`),
       h('p', null, playing ? 'The industrial district: your suppliers, customers and competitors.' : 'Grey dashed buildings are for rent. Pick one near the producers and buyers of what you plan to make. A building of 25,000 to 40,000 square feet is plenty to start.')),
       !playing ? h('button', { type: 'button', onclick: () => go('nation') }, 'Back to the map') : null),
-    h('div', { class: 'grid2', style: { gridTemplateColumns: 'minmax(0, auto) minmax(min(100%, 300px), 1fr)', alignItems: 'start' } },
+    h('div', { class: 'grid2 split-city' },
       h('div', { class: 'stack' }, h('div', { class: 'table-wrap' }, grid), legend),
       h('div', { class: 'stack' }, lotPanel(st, city.lots[v.sel]), marketPanel(st, v, producerFirms, consumerFirms))),
     playing ? ranksCard(st) : null);

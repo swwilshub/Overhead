@@ -59,12 +59,13 @@ export const prefs = {};
 export function dialog(title, body, actions = [], opts = {}) {
   return new Promise(resolve => {
     const id = 'dlg' + Math.random().toString(36).slice(2, 8);
-    const dlg = h('dialog', { 'aria-labelledby': id, class: opts.wide ? 'wide' : '' });
+    const dlg = h('dialog', { 'aria-labelledby': id, class: [opts.wide ? 'wide' : '', opts.cls || ''].filter(Boolean).join(' ') });
     if (opts.wide) dlg.style.width = 'min(860px, calc(100vw - 32px))';
     const close = v => { dlg.close(); dlg.remove(); resolve(v); };
     const acts = actions.map(a => h('button', { type: 'button', class: a.primary ? 'primary' : a.danger ? 'danger' : '', onclick: async () => { if (a.run) { const r = await a.run(dlg); if (r === false) return; } close(a.value); } }, a.label));
     dlg.append(h('div', { class: 'dlg' }, h('h2', { id }, title), body, acts.length ? h('div', { class: 'dlg-actions' }, acts) : null));
     dlg.addEventListener('cancel', e => { e.preventDefault(); close(null); });
+    if (opts.backdrop) dlg.addEventListener('click', e => { if (e.target === dlg) close(null); }); // a tap on the dimmed screen
     document.body.append(dlg);
     dlg.showModal();
     const first = dlg.querySelector('[autofocus]') || dlg.querySelector('input,select,textarea') || acts.find(b => b.classList.contains('primary')) || acts[0];

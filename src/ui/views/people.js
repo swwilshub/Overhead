@@ -126,7 +126,7 @@ export const inbox = {
       h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'In-basket'), h('p', null, `${num(st.memos.filter(m => !m.read).length)} unread of ${num(st.memos.length)} memos.`)),
         h('div', { class: 'row' }, h('button', { type: 'button', 'data-key': 'memo-readall', onclick: () => { st.memos.forEach(m => { m.read = true; }); act({ ok: true, msg: 'All memos marked read.' }); } }, 'Mark all read'), h('button', { type: 'button', 'data-key': 'memo-clear', onclick: () => { const n = st.memos.length; st.memos = st.memos.filter(m => !m.read || (m.kind === 'resume' && !m.data.hired && !m.data.gone)); act({ ok: true, msg: `Cleared ${n - st.memos.length} read memos.` }); } }, 'Clear read memos'))),
       filt,
-      h('div', { class: 'grid2', style: { gridTemplateColumns: 'minmax(min(100%, 320px), 1fr) minmax(min(100%, 320px), 1.3fr)', alignItems: 'start' } },
+      h('div', { class: 'grid2 split-inbox' },
         h('section', { class: 'card', 'aria-labelledby': 'mlist' }, h('h2', { id: 'mlist', class: 'sr-only' }, 'Memos'),
           list.length ? h('ul', { style: { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: '2px' } }, list.slice(0, 150).map(m => h('li', null, h('button', { type: 'button', 'data-key': 'memo-' + m.id, 'aria-current': open?.id === m.id ? 'true' : null,
             style: { width: '100%', justifyContent: 'space-between', textAlign: 'left', fontWeight: m.read ? 400 : 700, background: open?.id === m.id ? 'var(--accent-soft)' : 'var(--panel)' },
