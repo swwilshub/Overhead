@@ -1,4 +1,4 @@
-import { h, table, kv, announce, dialog, confirmBox, pill, meter, field, prefs } from '../dom.js';
+import { h, table, kv, announce, dialog, confirmBox, pill, meter, field, prefs, stepper } from '../dom.js';
 import { app, go, render as rerender, act, applyPrefs, NAV } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES, ECONOMY } from '../../gen/data.js';
@@ -38,7 +38,8 @@ export const purchasing = {
           { key: 'boxes', label: 'In stock', num: true, render: r => `${num(r.boxes)} boxes` },
           { key: 'onOrder', label: 'On order', num: true, render: r => num(r.onOrder) },
           { key: 'use', label: 'Use per day', num: true, render: r => `${num(r.use / ITEMS[r.id].pack)} boxes` },
-          { key: 'target', label: 'Target (boxes)', num: true, sortable: false, render: r => h('input', { type: 'number', min: 0, step: 1, value: r.target, 'aria-label': `Target stock for ${r.name} in boxes`, 'data-key': 'tgt-' + r.id, style: { width: '6em' }, onchange: e => { st.targets = { ...targets, [r.id]: Math.max(0, Math.round(+e.target.value)) }; announce(`Target for ${r.name} set to ${st.targets[r.id]} boxes.`, 'polite', false); } }) },
+          { key: 'target', label: 'Target (boxes)', num: true, sortable: false, render: r => stepper({ compact: true, label: `Target stock for ${r.name}, in boxes`, value: r.target, min: 0, max: 9999, step: 1, big: 10, key: 'tgt-' + r.id, format: n => String(n),
+            onChange: n => { st.targets = { ...(Object.keys(st.targets).length ? st.targets : G.suggestedTargets(st)), [r.id]: n }; }, onSettle: () => rerender({}) }) },
           { key: 'best', label: 'Best offer', num: true, render: r => r.best ? `${money2(r.best.boxPrice)}/box` : 'Sold out' },
           { key: 'buy', label: '', sortable: false, render: r => h('button', { type: 'button', 'data-key': 'buy-' + r.id, onclick: () => buyDialog(r.id) }, 'Buy…') }],
         rows, { hideCaption: true, empty: 'No machines need materials yet.' }),
@@ -54,14 +55,20 @@ export const purchasing = {
 export async function buyDialog(itemId) {
   const st = app.st; const vs = vendorsFor(st, itemId);
   if (!vs.length) { announce(`Nobody in ${st.city.name} sells ${ITEMS[itemId].name}.`, 'assertive'); return; }
-  const boxes = h('input', { type: 'number', id: 'buy-boxes', min: 1, step: 1, value: Math.max(1, Math.ceil(G.dailyUse(st, itemId) * 2 / ITEMS[itemId].pack) || 5) });
+  const perDay = G.dailyUse(st, itemId) / ITEMS[itemId].pack, room = Math.max(1, Math.floor(G.roomForOrders(st)));
+  const days = d => Math.max(1, Math.ceil(perDay * d));
+  const boxes = stepper({ label: 'Boxes to order', value: Math.min(room, days(2) || 5), min: 1, max: room, step: 1, big: 10, key: 'boxes', format: n => `${n} ${n === 1 ? 'box' : 'boxes'}`,
+    describe: n => perDay > 0 ? `About ${Math.round(n / perDay * 10) / 10} days of use.` : 'Nothing of yours uses this yet.',
+    presets: perDay > 0 ? [['2 days', 2], ['A week', 7], ['2 weeks', 14]].map(([label, d]) => ({ label, value: Math.min(room, days(d)) })) : [] });
   let chosen = G.bestVendor(st, itemId)?.firm ?? vs[0].firm;
+  const leftOf = v => Math.max(1, v.monthlyBoxes - (st.vendorBought[v.firm + ':' + itemId] || 0));
+  boxes.stepperLimit(Math.min(room, leftOf(vs.find(v => v.firm === chosen) || vs[0])));
   const radios = h('fieldset', { class: 'stack', style: { border: 'none', padding: 0, margin: 0, gap: '6px' } }, h('legend', { style: { fontWeight: 700, marginBottom: '6px' } }, 'Vendor'),
     vs.map(v => { const left = v.monthlyBoxes - (st.vendorBought[v.firm + ':' + itemId] || 0); return h('div', { class: 'row', style: { flexWrap: 'nowrap', alignItems: 'flex-start' } },
-      h('input', { type: 'radio', name: 'vendor', id: 'v-' + v.firm, value: v.firm, checked: v.firm === chosen, disabled: left <= 0, onchange: () => { chosen = v.firm; } }),
+      h('input', { type: 'radio', name: 'vendor', id: 'v-' + v.firm, value: v.firm, checked: v.firm === chosen, disabled: left <= 0, onchange: () => { chosen = v.firm; boxes.stepperLimit(Math.min(room, leftOf(v))); } }),
       h('label', { for: 'v-' + v.firm, style: { fontWeight: 400 } }, h('strong', null, v.name), ` — ${money2(v.boxPrice)} per box of ${ITEMS[itemId].pack}, quality ${v.quality}, about ${Math.round(v.minutes / 60 * 10) / 10} hours to deliver, ${left > 0 ? num(left) + ' boxes left this month' : 'sold out this month'}`)); }));
-  await dialog(`Buy ${ITEMS[itemId].name}`, h('div', { class: 'stack' }, h('p', null, `In stock: ${num(G.boxesOf(st, itemId))} boxes. Room in storage: ${num(G.freeBoxes(st))} boxes. You pay the invoice ten days after delivery.`), radios, field('Boxes', boxes)),
-    [{ label: 'Cancel', value: null }, { label: 'Place order', primary: true, run: () => { const r = G.placeOrder(st, itemId, chosen, +boxes.value); act(r, false, 'order'); return r.ok; } }]);
+  await dialog(`Buy ${ITEMS[itemId].name}`, h('div', { class: 'stack' }, h('p', null, `In stock: ${num(G.boxesOf(st, itemId))} boxes. Room in storage: ${num(G.freeBoxes(st))} boxes. You pay the invoice ten days after delivery.`), radios, h('div', { class: 'stack', style: { gap: '4px' } }, h('strong', null, 'Boxes'), boxes)),
+    [{ label: 'Cancel', value: null }, { label: 'Place order', primary: true, run: () => { const r = G.placeOrder(st, itemId, chosen, boxes.stepperValue()); act(r, false, 'order'); return r.ok; } }]);
 }
 
 // ================= Sales
@@ -81,7 +88,8 @@ export const sales = {
           { key: 'units', label: 'In stock', num: true, render: r => num(r.units) },
           { key: 'q', label: 'Quality', num: true, render: r => Math.round(r.q) },
           { key: 'market', label: 'Market price', num: true, render: r => money2(r.market) },
-          { key: 'price', label: 'Our price', num: true, sortable: false, render: r => h('input', { type: 'number', min: 0.01, step: 0.01, value: r.price.toFixed(2), 'aria-label': `Our price for ${r.name}`, 'data-key': 'price-' + r.id, style: { width: '7em' }, onchange: e => { const p = +e.target.value; if (p > 0) { st.prices[r.id] = p; announce(`${r.name} now priced at ${money2(p)}, ${pct(p / r.market)} of market.`); } } }) },
+          { key: 'price', label: 'Our price', num: true, sortable: false, render: r => stepper({ compact: true, label: `Our price for ${r.name}`, value: r.price, min: 0.01, max: Math.max(1, r.market * 10), decimals: 2, step: Math.max(0.01, Math.round(r.market * 0.01 * 100) / 100), big: Math.max(0.05, Math.round(r.market * 0.1 * 100) / 100), key: 'price-' + r.id, format: money2,
+            onChange: p => { st.prices[r.id] = p; }, onSettle: () => rerender({}) }) },
           { key: 'r', label: 'vs market', num: true, render: r => h('span', { class: r.r > 1.2 ? 'bad' : r.r < 0.9 ? 'warn' : '' }, pct(r.r)) },
           { key: 'trend', label: 'Market price, by month', sortable: false, render: r => { const hist = st.city.market[r.id].history || []; return h('span', { class: 'row', style: { flexWrap: 'nowrap', gap: '6px' } }, sparkline(hist.slice(-12)), h('span', { class: 'sr-only' }, hist.length > 1 ? `from ${money2(hist[Math.max(0, hist.length - 12)])} to ${money2(hist[hist.length - 1])}` : 'no history yet')); } },
           { key: 'sold', label: 'Sold this month', num: true, render: r => num(r.sold) },
@@ -125,22 +133,26 @@ export const bank = {
   live: true,
   render() {
     const st = app.st, b = st.bank;
-    const amt = h('input', { type: 'number', id: 'move-cash-amount', min: 0, step: 100, value: 10000 });
-    const loanAmt = h('input', { type: 'number', id: 'loan-amt', min: 5000, step: 1000, value: Math.min(100000, G.maxLoan(st)) });
+    const bv = (app.viewState.bank ||= {}), maxL = G.maxLoan(st);
+    if (bv.amt == null) bv.amt = 10000;
+    if (bv.loan == null || bv.loan > maxL) bv.loan = Math.max(Math.min(5000, maxL), Math.min(100000, maxL));
+    const amt = stepper({ label: 'Amount to move', value: bv.amt, min: 0, max: 10000000, step: 1000, big: 10000, key: 'move-amt', format: money, onChange: v => { bv.amt = v; },
+      presets: [1000, 5000, 10000, 50000, 100000].map(v => ({ label: money(v), value: v })) });
+    const loanAmt = stepper({ label: 'Loan amount', value: bv.loan, min: Math.min(5000, maxL), max: maxL, step: 1000, big: 10000, slider: true, key: 'loan-amt', format: money, onChange: v => { bv.loan = v; } });
     const years = h('select', { id: 'loan-yrs' }, [1, 2, 3, 4, 5].map(y => h('option', { value: y, selected: y === 3 }, `${y} year${y > 1 ? 's' : ''} at ${(G.loanRate(st, y) * 100).toFixed(2)}%`)));
     return h('div', { class: 'stack' },
       h('div', { class: 'view-head' }, h('div', null, h('h1', null, ECONOMY.bank.name), h('p', null, `Savings pay ${+(ECONOMY.bank.savingsRate * 100).toFixed(2)}% a year. When checking goes below zero, the bank moves money in from savings first and then from your credit line, which costs ${+(ECONOMY.bank.creditRate * 100).toFixed(2)}% a year.`))),
       h('div', { class: 'grid2' },
         h('section', { class: 'card stack' }, h('h2', null, 'Accounts'),
           kv([['Checking', money(b.checking)], ['Savings', money(b.savings)], ['Credit line used', `${money(b.credit)} of ${money(G.creditLimit(st))}`], ['Loans outstanding', money(b.loans.reduce((s, l) => s + l.balance, 0))]]),
-          h('div', { class: 'row', style: { alignItems: 'end' } }, field('Amount', amt),
-            h('button', { type: 'button', onclick: () => act(G.transfer(st, 'checking', +amt.value), false, 'cash') }, 'Checking → savings'),
-            h('button', { type: 'button', onclick: () => act(G.transfer(st, 'savings', +amt.value), false, 'cash') }, 'Savings → checking'),
-            b.credit > 0 ? h('button', { type: 'button', onclick: () => act(G.payCreditLine(st, +amt.value)) }, 'Repay credit line') : null)),
+          h('div', { class: 'row', style: { alignItems: 'end' } }, h('div', { class: 'stack', style: { gap: '4px', flex: '1 1 12em', minWidth: 0 } }, h('strong', null, 'Amount'), amt),
+            h('button', { type: 'button', onclick: () => act(G.transfer(st, 'checking', amt.stepperValue()), false, 'cash') }, 'Checking → savings'),
+            h('button', { type: 'button', onclick: () => act(G.transfer(st, 'savings', amt.stepperValue()), false, 'cash') }, 'Savings → checking'),
+            b.credit > 0 ? h('button', { type: 'button', onclick: () => act(G.payCreditLine(st, amt.stepperValue())) }, 'Repay credit line') : null)),
         h('section', { class: 'card stack' }, h('h2', null, 'Borrow'),
           h('p', null, `The bank will lend up to ${money(G.maxLoan(st))} right now. At most five loans at a time.`),
-          h('div', { class: 'grid2', style: { gap: '10px' } }, field('Amount', loanAmt), field('Term and rate', years)),
-          h('button', { class: 'primary', type: 'button', onclick: async () => { const y = +years.value, a = +loanAmt.value, r = G.loanRate(st, y), i = r / 12, n = y * 12; const pmt = a * i / (1 - Math.pow(1 + i, -n)); if (await confirmBox('Take this loan?', `Borrow ${money(a)} for ${y} years at ${(r * 100).toFixed(2)}%. Payments of ${money(pmt)} a month.`, 'Borrow')) act(G.takeLoan(st, a, y), false, 'cash'); } }, 'Apply for loan'))),
+          h('div', { class: 'grid2', style: { gap: '10px' } }, h('div', { class: 'stack', style: { gap: '4px' } }, h('strong', null, 'Amount'), loanAmt), field('Term and rate', years)),
+          h('button', { class: 'primary', type: 'button', onclick: async () => { const y = +years.value, a = loanAmt.stepperValue(), r = G.loanRate(st, y), i = r / 12, n = y * 12; const pmt = a * i / (1 - Math.pow(1 + i, -n)); if (await confirmBox('Take this loan?', `Borrow ${money(a)} for ${y} years at ${(r * 100).toFixed(2)}%. Payments of ${money(pmt)} a month.`, 'Borrow')) act(G.takeLoan(st, a, y), false, 'cash'); } }, 'Apply for loan'))),
       h('section', { class: 'card' }, h('h2', null, 'Loans'),
         table('Loans', [
           { key: 'principal', label: 'Borrowed', num: true, render: l => h('span', { 'data-rowname': '' }, money(l.principal)) }, { key: 'balance', label: 'Balance', num: true, render: l => money(l.balance) },

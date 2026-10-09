@@ -1,4 +1,4 @@
-import { h, table, kv, announce, dialog, confirmBox, pill, meter, field, tabs, ladderDots, levelLine, carousel } from '../dom.js';
+import { h, table, kv, announce, dialog, confirmBox, pill, meter, field, tabs, ladderDots, levelLine, carousel, stepper } from '../dom.js';
 import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
 import { JOBS, JOB_LIST, AD_TARGETS, ladder, LEVEL_NAME, levelOf, deptName, hasRole, ATTR_GROUPS, ATTRS, NEGATIVE_ATTRS } from '../../core/content.js';
@@ -114,7 +114,10 @@ export async function openResume(memoId) {
   const st = app.st, m = st.memos.find(x => x.id === memoId); if (!m) return;
   m.read = true;
   const c = m.data.cand;
-  const offer = h('input', { type: 'number', id: 'salary-offer', min: 0, step: 500, value: c.ask, inputmode: 'numeric' });
+  const lo = Math.round(c.ask * 0.7 / 500) * 500, hi = Math.round(c.ask * 1.3 / 500) * 500;
+  const rel = v => v === c.ask ? 'exactly what they ask' : `${pct(Math.abs(v - c.ask) / c.ask)} ${v < c.ask ? 'under' : 'over'} what they ask`;
+  const offer = stepper({ label: 'Your offer, a year', value: c.ask, min: lo, max: hi, step: 500, big: 2000, slider: true, key: 'offer', format: money,
+    describe: v => `${money(v)} is ${rel(v)}.`, presets: [['Ask −10%', 0.9], ['Ask −5%', 0.95], ['Ask', 1], ['Ask +5%', 1.05]].map(([label, m]) => ({ label, value: Math.round(c.ask * m / 100) * 100 })) });
   const top = ATTR_GROUPS.flatMap(([, l]) => l).map(([k, label]) => ({ label, v: c.attrs[ATTRS.indexOf(k)], neg: NEGATIVE_ATTRS.has(k) }));
   const strengths = top.filter(t => !t.neg).sort((a, b) => b.v - a.v).slice(0, 4).map(t => t.label.toLowerCase());
   const weak = top.filter(t => !t.neg).sort((a, b) => a.v - b.v).slice(0, 2).map(t => t.label.toLowerCase());
@@ -123,8 +126,8 @@ export async function openResume(memoId) {
     kv([['Seeking', JOBS[c.job].title], ['Desired salary', money(c.ask)], ['City average', money(marketSalary(st, c.job))], ['Estimated job fit', c.fitEstimate + '%'], ['Age', String(c.age)], ['Experience', `${c.years} years`]]),
     h('div', null, h('h3', { style: { fontSize: '1rem' } }, 'Employment history'), c.history.length ? h('ul', null, c.history.map(x => h('li', null, x))) : h('p', null, 'No previous jobs.')),
     h('p', null, `References describe ${c.female ? 'her' : 'him'} as strong in ${strengths.join(', ')}; weaker in ${weak.join(' and ')}.${habits.length ? ` Known for frequent ${habits.join(' and ')}.` : ''}`),
-    m.data.hired ? h('p', { class: 'good' }, 'Hired.') : m.data.gone ? h('p', { class: 'muted' }, 'No longer available.') : field('Your offer (yearly salary)', offer, 'Offers well below the asking salary are usually turned down.'));
-  const actions = m.data.hired || m.data.gone ? [{ label: 'Close', value: null, primary: true }] : [{ label: 'Close', value: null }, { label: 'Make offer', value: 'offer', primary: true, run: () => { const r = G.makeOffer(st, m.id, +offer.value); act(r, false, 'hire'); return r.ok || m.data.gone ? true : false; } }];
+    m.data.hired ? h('p', { class: 'good' }, 'Hired.') : m.data.gone ? h('p', { class: 'muted' }, 'No longer available.') : h('div', { class: 'stack', style: { gap: '4px' } }, h('strong', null, 'Your offer (yearly salary)'), offer, h('p', { class: 'muted', style: { margin: 0, fontSize: '0.85rem' } }, 'Offers well below the asking salary are usually turned down.')));
+  const actions = m.data.hired || m.data.gone ? [{ label: 'Close', value: null, primary: true }] : [{ label: 'Close', value: null }, { label: 'Make offer', value: 'offer', primary: true, run: () => { const r = G.makeOffer(st, m.id, offer.stepperValue()); act(r, false, 'hire'); return r.ok || m.data.gone ? true : false; } }];
   await dialog(`Resume: ${c.first} ${c.last}`, body, actions, { wide: true });
   rerender({});
 }

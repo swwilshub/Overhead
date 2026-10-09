@@ -50,7 +50,7 @@ Sprint 5 (planned, moved from 4): the page-and-swipe pattern and every section s
 
 | Spec | Item | Impact | Effort | Pillars | Status | Evidence |
 |---|---|---|---|---|---|---|
-| 014 | **Numbers by touch:** a stepper control (buttons, chips, slider) replaces every typed number: salary offer, order boxes, purchasing targets, sales prices, bank amounts, scenario number. | 5 | M | 1, 4 | specced | Sam; audit in the spec |
+| 014 | **Numbers by touch:** a stepper control (buttons, chips, slider) replaces every typed number: salary offer, order boxes, purchasing targets, sales prices, bank amounts, scenario number. | 5 | M | 1, 4 | review | Sam; audit in the spec |
 | — | **Names without typing** (company and player name): proposed for the next spec, needs Sam's call. | 3 | S | 4 | new | Sam |
 
 ## Full backlog

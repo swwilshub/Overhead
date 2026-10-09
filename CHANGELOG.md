@@ -4,6 +4,13 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- No more typing numbers. Every number you set is now a control you tap: big plus and minus buttons (hold to repeat,
+  faster the longer you hold), preset chips and a slider where one helps. A salary offer has a slider from 70% to 130% of
+  the ask, buttons for $500 and $2,000, chips for Ask −10%, −5%, the ask and +5%, and a line saying how your offer
+  compares. Orders have chips for two days, a week and two weeks of use, and stop at what the vendor has left. Purchasing
+  targets and sales prices step in their rows, bank amounts have chips, loans have a slider, and the scenario number is a
+  stepper with a Roll button. Arrow keys, Page Up, Page Down, Home and End work on every one, and screen readers hear the
+  value. Company and player names are still typed.
 - Seniority. Every kind of job now has three levels: Junior, Senior and Director (Junior Operator, Senior Operator,
   Operations Director, and so on for Maintenance, Engineering, Finance, Sales, Promotions and Purchasing). People start
   where they were hired and learn on the job, so a Junior who works a machine, a desk or an office climbs to Senior in

@@ -9,6 +9,10 @@ def ok(c, m):
 # Code leaking into the page: null, undefined and NaN as whole words (run together too, as in "nullnull"),
 # or a stringified object.
 JUNK = re.compile(r'(?<![A-Za-z])(?:null|undefined|NaN)+(?![A-Za-z])|\[object')
+async def set_seed(pg, n):
+    await pg.focus('[data-key="seed"]')
+    for _ in range(n // 100): await pg.keyboard.press('PageUp')
+    for _ in range(n % 100): await pg.keyboard.press('ArrowUp')
 async def no_junk_text(pg, where):
     txt = await pg.evaluate("() => document.body.innerText")
     names = await pg.evaluate("() => [...document.querySelectorAll('[aria-label],[aria-valuetext],[title],[alt]')].map(e => ['aria-label','aria-valuetext','title','alt'].map(a => e.getAttribute(a) || '').join(' ')).join('\\n')")
@@ -43,7 +47,7 @@ async def main():
         # found a company: the status bar shows the company, then the city once chosen, never "null"
         await pg.click('a[href="#new-game"]'); await pg.wait_for_timeout(300)
         await no_junk_text(pg, 'new company form'); await axe_check(pg, 'new company form')
-        await pg.fill('#ng-company', 'Junk Check Co'); await pg.fill('#ng-seed', '7')
+        await pg.fill('#ng-company', 'Junk Check Co'); await set_seed(pg, 7)
         await pg.click('text=Found the company'); await pg.wait_for_timeout(500)
         status = await pg.locator('header.status').text_content()
         ok('Junk Check Co' in status and 'null' not in status, 'status bar after founding: ' + ' '.join(status.split()))

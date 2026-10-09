@@ -281,3 +281,76 @@ export function carousel(items, render, opts = {}) {
     onkeydown: e => { if (e.target !== e.currentTarget && !e.target.matches?.('.carousel-btn')) return; const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (d) { e.preventDefault(); move(d); } } },
     card, h('div', { class: 'carousel-bar' }, prev, count, next));
 }
+
+// ---- a stepper: sets a number without the keyboard.
+//   label       what it sets ("Salary offer"); names the group, the readout and the buttons
+//   value, min, max, step, big   the number, its range, and the small and large steps (big defaults to 10 × step)
+//   decimals    digits kept (2 for dollars and cents); values are rounded to this
+//   format(v)   how a value reads ("$27,000"); also what a screen reader says
+//   presets     [{ label, value }] chips that jump to a value
+//   slider      add a range slider across min to max
+//   compact     just minus, readout and plus: fits a table cell
+//   describe(v) a line under the control that reads the current value in context
+//   onChange(v) called with each new value; onSettle() half a second after the last one (a page can redraw then)
+//   key         data-key prefix for the controls (tests, focus after a redraw)
+// Hold a button to repeat: faster after a second, faster again after two. The readout is a spinbutton: arrows step,
+// Page Up and Page Down take the big step, Home and End go to the ends.
+export function stepper(o) {
+  const dec = o.decimals ?? 0, scale = 10 ** dec, rnd = x => Math.round(x * scale) / scale;
+  let max = o.max ?? Infinity; const min = o.min ?? 0, small = o.step ?? 1, big = o.big ?? small * 10;
+  const fmt = o.format || (v => String(v)), clamp = x => Math.min(max, Math.max(min, rnd(x)));
+  const k = o.key ? s => ({ 'data-key': `${o.key}-${s}` }) : () => ({});
+  let cur = clamp(o.value ?? min);
+  const readout = h('span', { class: 'stepper-value num', role: 'spinbutton', tabindex: 0, 'aria-label': o.label, ...(o.key ? { 'data-key': o.key } : {}),
+    onkeydown: e => {
+      const d = { ArrowUp: small, ArrowRight: small, ArrowDown: -small, ArrowLeft: -small, PageUp: big, PageDown: -big }[e.key];
+      if (d) { e.preventDefault(); set(cur + d); }
+      else if (e.key === 'Home') { e.preventDefault(); set(min); }
+      else if (e.key === 'End' && isFinite(max)) { e.preventDefault(); set(max); }
+    } });
+  const say = h('span', { class: 'sr-only', 'aria-live': 'polite' });
+  const note = o.describe ? h('p', { class: 'stepper-note muted' }) : null;
+  const slider = o.slider && isFinite(max) ? h('input', { type: 'range', class: 'stepper-slider', min, max, step: small, 'aria-label': `${o.label}, slider`, ...k('slider'), oninput: e => set(+e.target.value) }) : null;
+  const chips = (o.presets || []).map(p => h('button', { type: 'button', class: 'chip', ...k('chip-' + String(p.label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')), onclick: () => set(p.value) }, p.label));
+  let timer = null;
+  function paint() {
+    const text = fmt(cur);
+    readout.textContent = text; readout.setAttribute('aria-valuenow', cur); readout.setAttribute('aria-valuetext', text); readout.setAttribute('aria-valuemin', min);
+    if (isFinite(max)) readout.setAttribute('aria-valuemax', max);
+    if (slider) { slider.value = cur; slider.setAttribute('aria-valuetext', text); }
+    for (const b of buttons) b.el.disabled = b.dir < 0 ? cur <= min : cur >= max;
+    (o.presets || []).forEach((p, i) => chips[i].setAttribute('aria-pressed', String(cur === clamp(p.value))));
+    if (note) note.textContent = o.describe(cur);
+  }
+  function set(v) {
+    const n = clamp(v); if (n === cur) return;
+    cur = n; paint(); o.onChange?.(cur);
+    clearTimeout(timer); timer = setTimeout(() => { say.textContent = ''; setTimeout(() => { say.textContent = `${o.label}: ${fmt(cur)}`; }, 30); o.onSettle?.(); }, 500);
+  }
+  const buttons = [];
+  // a button that steps once on a press and repeats while it is held; a keyboard click steps once
+  function stepBtn(dir, amount, text, name) {
+    let rep = null, t0 = 0, fired = false;
+    const stop = () => { clearTimeout(rep); rep = null; delete document.body.dataset.stepping; };
+    const tick = () => { const held = performance.now() - t0; set(cur + dir * amount * (held > 2000 ? 10 : held > 1000 ? 3 : 1)); rep = setTimeout(tick, held > 1000 ? 60 : 120); };
+    const el = h('button', { type: 'button', class: 'stepper-btn', 'aria-label': `${dir < 0 ? 'Decrease' : 'Increase'} ${o.label} by ${fmt(amount)}`, ...k(name),
+      onpointerdown: e => { if (e.pointerType === 'mouse' && e.button !== 0) return; fired = true; t0 = performance.now(); document.body.dataset.stepping = '1'; set(cur + dir * amount); rep = setTimeout(tick, 450); try { el.setPointerCapture(e.pointerId); } catch {} },
+      onclick: () => { if (fired) { fired = false; return; } set(cur + dir * amount); },
+      oncontextmenu: e => e.preventDefault() }, text);
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, stop);
+    buttons.push({ el, dir });
+    return el;
+  }
+  const sign = (dir, amount) => (dir < 0 ? '−' : '+') + (o.compact ? '' : fmt(amount));
+  const ctl = o.compact
+    ? h('div', { class: 'stepper-row' }, stepBtn(-1, small, '−', 'minus'), readout, stepBtn(1, small, '+', 'plus'))
+    : h('div', { class: 'stepper-main' }, readout,
+        h('div', { class: 'stepper-row' }, big > small ? stepBtn(-1, big, sign(-1, big), 'minus-big') : null, stepBtn(-1, small, sign(-1, small), 'minus'), stepBtn(1, small, sign(1, small), 'plus'), big > small ? stepBtn(1, big, sign(1, big), 'plus-big') : null));
+  const root = h('div', { class: o.compact ? 'stepper compact' : 'stepper', role: 'group', 'aria-label': o.label }, ctl, slider, chips.length ? h('div', { class: 'stepper-chips' }, chips) : null, note, say);
+  paint();
+  root.stepperValue = () => cur;
+  root.stepperSet = set;
+  // change the top of the range (the vendor you pick may have less to sell); the value is pulled down to fit
+  root.stepperLimit = m => { max = Math.max(min, m); if (slider) slider.max = max; readout.setAttribute('aria-valuemax', max); const was = cur; cur = clamp(cur); paint(); if (cur !== was) o.onChange?.(cur); };
+  return root;
+}

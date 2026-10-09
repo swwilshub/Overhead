@@ -34,7 +34,7 @@ about to agree to before I do.
    **Ask −10%, Ask −5%, Ask, Ask +5%**. A line under it says how the offer compares: "$27,000, 4% under what they ask".
    It starts at the asking salary.
 3. **Order boxes** is a stepper (1 and 10 at a time) with chips for **2 days, a week and two weeks** of use, capped at
-   the room left for orders.
+   the room left for orders and at what the chosen vendor has left this month (the cap follows the vendor you pick).
 4. **Purchasing targets** and **Sales prices** are compact steppers in their rows. A price steps by 1% of the market
    price (by 10% with a long hold or Page Up and Page Down) and never goes below one cent.
 5. **Bank:** the amount to move has chips ($1,000, $5,000, $10,000, $50,000, $100,000) and a stepper; the loan amount is a
