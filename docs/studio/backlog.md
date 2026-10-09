@@ -31,3 +31,7 @@ Left for later sprints (from this playtest): the lease screen's legend and defau
 | 9 | **Sound:** a mixer (effects, ambience, alerts) and an optional factory ambience that rises and falls with throughput. | 2 | S | 5 | new | |
 | 10 | **Touch and small screens:** tap to place and pinch to zoom, with the floor playable at 768 px wide. | 3 | M | 4 | new | |
 | 11 | **Render headroom:** the floor frame on the largest building with 40 machines averages 13.4 ms, against a 16 ms budget (p95 17.5 ms, headless Chromium). Cache static layers per machine, or skip redrawing idle machines. | 3 | M | 1, 5 | new | Found while setting up `test/perf_ui_test.py`. |
+| 12 | **Cell editor loses focus:** pressing Enter on "Standard layout" sends focus to the page body, because the panel is redrawn under the button. | 3 | S | 4 | new | QA on 002 (finding 3). Happens before 002. Check again once 004 has merged, since it adds focus keeping. |
+| 13 | **Deselecting with Enter is silent:** Enter on an empty square clears the selection but only reads the square. Escape says "Selection cleared." | 2 | S | 4 | new | QA on 002 (finding 4). `primary()` in `floor.js`. |
+| 14 | **"Set up a new company" link drops focus** to the page body. | 2 | S | 4 | new | QA on 002 (finding 5). The Nation map's arrow keys are covered by 004. |
+| 15 | **Test tidy-up:** `ui_test.py` hard-codes 42 cities in the caption check, never checks the cell editor's room-size step for junk text, and skips axe on Research. | 1 | S | 4 | new | QA on 002 (findings 1 and 2). |
