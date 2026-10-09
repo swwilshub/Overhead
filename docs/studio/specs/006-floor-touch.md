@@ -22,15 +22,18 @@ Zoom is a number from the plant-fits-the-frame minimum ("fit") up to 4×.
 
 1. **Pan.** In Select mode, a one-finger drag scrolls the floor, following the finger. A touch that moves less than
    10 px and lasts under 500 ms is a tap. Two fingers pan in every mode.
-2. **Pinch zoom.** Two fingers zoom between "fit" and 4×, keeping the point between the fingers where it is. The number
-   beside the buttons shows it ("1.5×"). The zoom buttons now step by a quarter turn of the same scale (×1.25), and a
-   new **Fit** button shows the whole plant. Zoom survives a redraw and is kept per game while it is open.
+2. **Pinch zoom.** Two fingers zoom between ¼× and 4×, keeping the point between the fingers where it is. The number
+   beside the buttons shows it ("1.5×"). The zoom buttons step through ¼, ½, ¾, 1, 1.5, 2, 3 and 4, and a new **Fit**
+   button shows the whole plant. Zoom and the scrolled position survive a redraw and are kept while the game is open.
+   On a phone the floor starts fitted to the screen (between 1× and 2×); everywhere else it still starts at 2×.
 3. **Tap selects, drag does not.** A tap on a square moves the cursor there and selects (or clears) as a click does. A
    drag in Select mode never selects.
-4. **Placing needs a confirm.** When a machine, office, bin or other item is being placed or moved, a touch moves the
-   ghost (a drag moves it with the finger) and lifting does nothing. A bar over the floor offers **Place here**
-   (or **Move here**), **Rotate** and **Cancel**. Nothing is bought until Place here. Paint zones and Lay conveyor keep
-   their drag-to-paint behaviour with one finger, and each stroke is one undo-free action as today.
+4. **Placing needs a confirm.** On a touch screen (primary pointer coarse), when a machine, office, bin or other item
+   is being placed or moved, a touch moves the ghost (a drag moves it with the finger) and lifting does nothing; a new
+   item starts in the middle of what is on screen. A bar under the floor, sticking to the bottom of the screen, offers
+   **Place here** (or **Move here**), **Rotate** and **Cancel**. Nothing is bought until Place here. Paint zones and Lay
+   conveyor keep their drag-to-paint behaviour with one finger, and on a phone the zone picker appears once Paint zones
+   is chosen.
 5. **Everything has a button.** Anything a gesture does can be done with a button or the keyboard (zoom −, +, Fit;
    Place here, Rotate, Cancel; the existing keys). Buttons used by touch are at least 44 × 44 CSS px.
 6. **No regression.** Mouse and keyboard behaviour is identical to today; the credit dialog, focus rules from spec 004
@@ -52,11 +55,13 @@ purchases).
   buttons in the toolbar group, reached with Tab, and announces "Placing X. Place here, Rotate or Cancel."
 - **Announcements:** pinch end announces the zoom once ("Zoom 150 percent"), not during the gesture.
 - **Reduced motion:** panning follows the finger and has no animation of its own.
+- **Long press:** a long press does not count as a right click (which cancels), and the browser's own menu is blocked.
+- **Help text:** on a touch screen the line under the floor describes the gestures and keeps a short keyboard line.
 - **Not colour only:** the action bar uses text labels.
 
 ## Balance knobs
 
-None. Constants in `floor.js`: `TAP_PX = 10`, `TAP_MS = 500`, `ZOOM_MAX = 4`, `ZOOM_STEP = 1.25`.
+None. Constants in `floor.js`: `TAP_PX = 10`, `TAP_MS = 500`, `ZOOM_MIN = 0.25`, `ZOOM_MAX = 4`, `ZOOM_STEPS`.
 
 ## Test plan
 

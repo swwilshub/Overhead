@@ -4,6 +4,11 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- Phone layout, part 3: the floor works with a finger. Drag to look around, pinch to zoom (a quarter to four times),
+  tap a machine to select it, and use Fit to see the whole plant. Painting zones and laying conveyor still work by
+  dragging. When you place or move something, the outline follows your finger and nothing is bought until you press
+  **Place here**; **Rotate** and **Cancel** sit beside it. The floor stays where you scrolled it, zoom buttons are
+  finger-sized, and on a phone the plant starts fitted to the screen.
 - Phone layout, part 2. Questions pop up as a sheet at the bottom of the screen with big full-width buttons. Tapping a
   machine opens a short sheet with its name and status, with Details for the rest and Close to dismiss it, so the plant
   stays in view. Messages now show under the top bar instead of over the bottom bar.

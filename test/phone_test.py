@@ -105,7 +105,8 @@ async def main():
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
         # ---- the selected item's panel is a sheet
         async def tile_xy(tx, ty):
-            r = await box(pg, '#floor-app canvas'); return r['x'] + (6 + tx * 16 + 8) * 2, r['y'] + (28 + ty * 16 + 8) * 2
+            r = await box(pg, '#floor-app canvas'); z = await pg.evaluate("() => window.__overhead.app.viewState.floor.zoom")
+            return r['x'] + (6 + tx * 16 + 8) * z, r['y'] + (28 + ty * 16 + 8) * z
         mc = await pg.evaluate("() => { const o = window.__overhead.app.st.floor.objects.find(o => o.kind === 'machine'); return [Math.round(o.x), Math.round(o.y)]; }")
         ok(not await pg.evaluate("() => document.getElementById('inspector').classList.contains('sheet')"), 'with nothing selected the panel is not a sheet')
         async def tap_machine():

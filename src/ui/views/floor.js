@@ -16,14 +16,51 @@ import { editing, editorPrimary, editorKey, editorPanel, editorDraw, speakCell, 
 import { analyseSuite } from '../../sim/suites.js';
 import { workSquare, isStation, itemDef, METRICS } from '../../sim/cells.js';
 
-export const vs = () => (app.viewState.floor ||= { zoom: 1, cx: 2, cy: 2, sel: null, mode: 'select', placing: null, zone: ZONE.SAFETY, rot: 0, moving: null });
+export const vs = () => (app.viewState.floor ||= { cx: 2, cy: 2, sel: null, mode: 'select', placing: null, zone: ZONE.SAFETY, rot: 0, moving: null });
 export const live = true;
 
 let canvas = null, raf = 0, colors = null, colorsAt = 0, dragging = false;
+
+// ---------- zoom and touch (spec 006)
+// Zoom is a number from ZOOM_MIN to ZOOM_MAX, applied as the canvas's CSS size, so pinching never redraws. The canvas's own
+// resolution (v.pix) stays a whole number, chosen from the zoom, so the pixel art stays crisp.
+const TAP_PX = 10, TAP_MS = 500, ZOOM_MIN = 0.25, ZOOM_MAX = 4, ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+const touchUI = () => matchMedia('(pointer: coarse)').matches;
+const pixFor = z => Math.min(4, Math.max(1, Math.ceil(z - 1e-6)));
+const fmtZoom = z => `${+z.toFixed(2)}×`;
+const clampZoom = z => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const isPaint = v => v.mode === 'zone' || (v.mode === 'place' && !!v.placing?.repeat);
+const isGhost = v => (v.mode === 'place' && !v.placing?.repeat) || v.mode === 'move';
+function fitZoom() {
+  const fr = document.getElementById('floor-app'); if (!fr || !curView) return 1;
+  const maxH = parseFloat(getComputedStyle(fr).maxHeight) || innerHeight * 0.7;
+  return clampZoom(Math.min(fr.clientWidth / curView.W, maxH / curView.H));
+}
+function zoomTo(z, ax, ay) {
+  const v = vs(), fr = document.getElementById('floor-app'); if (!fr || !canvas || !curView) return;
+  z = clampZoom(z); const old = v.zoom || 2, r = fr.getBoundingClientRect();
+  if (ax == null) { ax = r.left + fr.clientWidth / 2; ay = r.top + fr.clientHeight / 2; }
+  const px = ax - r.left - fr.clientLeft, py = ay - r.top - fr.clientTop;      // the anchor, inside the scrolling frame
+  const cx = (fr.scrollLeft + px) / old, cy = (fr.scrollTop + py) / old;       // and what is under it, at zoom 1
+  v.zoom = z;
+  canvas.style.width = curView.W * z + 'px'; canvas.style.height = curView.H * z + 'px';
+  const pix = pixFor(z); if (pix !== v.pix) { v.pix = pix; canvas.width = curView.W * pix; canvas.height = curView.H * pix; }
+  fr.scrollLeft = cx * z - px; fr.scrollTop = cy * z - py; v.scrollX = fr.scrollLeft; v.scrollY = fr.scrollTop;
+  const num = document.querySelector('.floor-tools .zoom-num'); if (num) num.textContent = fmtZoom(z);
+  const zo = document.querySelector('[data-key="ft-zo"]'), zi = document.querySelector('[data-key="ft-zi"]');
+  if (zo) zo.disabled = z <= ZOOM_MIN + 1e-6; if (zi) zi.disabled = z >= ZOOM_MAX - 1e-6;
+}
+const announceZoom = () => announce(`Zoom ${Math.round(vs().zoom * 100)} percent.`, 'polite', false);
+function stepZoom(dir) {
+  const z = vs().zoom, next = dir > 0 ? ZOOM_STEPS.find(x => x > z + 0.01) : [...ZOOM_STEPS].reverse().find(x => x < z - 0.01);
+  if (next) { zoomTo(next); announceZoom(); }
+}
+function fitView() { zoomTo(fitZoom()); const fr = document.getElementById('floor-app'); if (fr) { fr.scrollLeft = 0; fr.scrollTop = 0; } announceZoom(); }
 window.addEventListener('pointerup', () => { dragging = false; });
 
 export function startPlacing(spec) {
-  const v = vs(); v.mode = 'place'; v.placing = spec; v.rot = 0; v.sel = null;
+  const v = vs(); v.mode = 'place'; v.placing = spec; v.rot = 0; v.sel = null; v.centerGhost = touchUI() && !spec.repeat;
   go('floor');
   setTimeout(() => document.getElementById('floor-app')?.focus(), 50);
   announce(`Placing ${spec.label}. Move with the arrow keys or mouse, R to rotate, Enter to place, Escape to cancel.`, 'polite', false);
@@ -36,24 +73,29 @@ export function render() {
   if (!st.move) v.site = 'old';
   const newSite = onNewSite(st, v), fl = newSite ? st.move.floor : st.floor;
   if (newSite && v.mode !== 'select') { v.mode = 'select'; v.placing = null; v.moving = null; v.cell = null; }
-  if (!v.pix) v.pix = 2;
-  const view = makeView(fl, v.pix); curView = view;
-  canvas = h('canvas', { width: view.W * v.pix, height: view.H * v.pix, 'aria-hidden': 'true', style: { imageRendering: 'pixelated' } });
+  const view = makeView(fl, 2); curView = view;
+  // first time: the old default of 2×; on a phone, the plant fitted to the screen (between 1× and 2×)
+  if (!v.zoom) v.zoom = isCompact() ? Math.min(2, Math.max(1, ((document.getElementById('main')?.clientWidth || innerWidth) - 28) / view.W)) : 2;
+  v.pix = pixFor(v.zoom);
+  canvas = h('canvas', { width: view.W * v.pix, height: view.H * v.pix, 'aria-hidden': 'true', style: { imageRendering: 'pixelated', width: view.W * v.zoom + 'px', height: view.H * v.zoom + 'px' } });
   const helpId = 'floor-help';
   const appEl = h('div', { id: 'floor-app', class: 'floor-frame', role: 'application', tabindex: 0, 'aria-roledescription': 'factory floor', 'aria-label': `Factory floor, ${fl.w} squares wide and ${fl.h} deep. ${modeText(v)}`, 'aria-describedby': helpId }, canvas);
   wireCanvas(appEl, st, v, view);
   const tools = h('div', { class: 'floor-tools', role: 'toolbar', 'aria-label': 'Floor tools' },
     h('button', { type: 'button', 'aria-pressed': String(v.mode === 'select'), 'data-key': 'ft-select', onclick: () => setMode('select') }, 'Select'),
     h('button', { type: 'button', 'aria-pressed': String(v.mode === 'zone'), 'data-key': 'ft-zone', onclick: () => setMode('zone') }, 'Paint zones'),
-    h('select', { 'aria-label': 'Zone to paint', 'data-key': 'ft-zonesel', onchange: e => { v.zone = +e.target.value; setMode('zone'); } }, ZONE_INFO.map((z, i) => h('option', { value: i, selected: v.zone === i }, z.name))),
+    h('select', { 'aria-label': 'Zone to paint', 'data-key': 'ft-zonesel', hidden: isCompact() && v.mode !== 'zone', onchange: e => { v.zone = +e.target.value; setMode('zone'); } }, ZONE_INFO.map((z, i) => h('option', { value: i, selected: v.zone === i }, z.name))),
     h('button', { type: 'button', 'aria-pressed': String(v.mode === 'place' && v.placing?.kind === 'conveyor'), 'data-key': 'ft-belt', onclick: () => startPlacing({ kind: 'conveyor', label: 'conveyor belt', repeat: true }) }, `Lay conveyor (${money(KINDS.conveyor.price)})`),
     h('button', { type: 'button', 'data-key': 'ft-catalog', onclick: () => go('catalog') }, 'Catalog…'),
     h('span', { style: { flex: '1' } }),
-    h('button', { type: 'button', 'aria-label': 'Zoom out', 'data-key': 'ft-zo', disabled: v.pix <= 1, onclick: () => { v.pix = Math.max(1, v.pix - 1); rerender({}); } }, '−'),
-    h('span', { class: 'num', 'aria-live': 'off' }, v.pix + '×'),
-    h('button', { type: 'button', 'aria-label': 'Zoom in', 'data-key': 'ft-zi', disabled: v.pix >= 4, onclick: () => { v.pix = Math.min(4, v.pix + 1); rerender({}); } }, '+'));
-  const help = h('p', { id: helpId, class: 'floor-help' }, 'Arrow keys move the cursor one square (Shift moves five). Enter selects or places. R rotates. M moves the selected item. Delete sells it. Escape cancels. ',
-    shortcutsOn() ? 'Space starts or pauses the clock, and [ ], ? and g then a letter work here too.' : 'Space also selects or places.');
+    h('div', { class: 'zoom-group', role: 'group', 'aria-label': 'Zoom' },
+      h('button', { type: 'button', 'aria-label': 'Zoom out', 'data-key': 'ft-zo', disabled: v.zoom <= ZOOM_MIN + 1e-6, onclick: () => stepZoom(-1) }, '−'),
+      h('span', { class: 'num zoom-num', 'aria-live': 'off' }, fmtZoom(v.zoom)),
+      h('button', { type: 'button', 'aria-label': 'Zoom in', 'data-key': 'ft-zi', disabled: v.zoom >= ZOOM_MAX - 1e-6, onclick: () => stepZoom(1) }, '+'),
+      h('button', { type: 'button', 'data-key': 'ft-fit', onclick: fitView }, 'Fit')));
+  const keys = ['Arrow keys move the cursor one square (Shift moves five). Enter selects or places. R rotates. M moves the selected item. Delete sells it. Escape cancels. ',
+    shortcutsOn() ? 'Space starts or pauses the clock, and [ ], ? and g then a letter work here too.' : 'Space also selects or places.'];
+  const help = h('p', { id: helpId, class: 'floor-help' }, touchUI() ? ['Drag to look around and pinch to zoom. Tap a machine to select it. When placing, drag the outline, then press Place here. With a keyboard: ', keys] : keys);
   const fixes = newSite ? [] : setupProblems(st);
   const siteTabs = st.move ? h('div', { class: 'site-tabs', role: 'tablist', 'aria-label': 'Which building' },
     [['old', `Current plant · ${st.city.lots[st.lotId].addr}`], ['new', `New site · ${st.city.lots[st.move.lotId].addr} · ${Math.round(G.moveProgress(st) * 100)}% built`]].map(([k, label]) =>
@@ -62,7 +104,7 @@ export function render() {
     h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Factory floor'), h('p', null, `${st.city.lots[st.lotId].addr} · ${num(st.city.lots[st.lotId].sqft)} sq ft · storage ${num(G.boxesStored(st))} of ${num(storageCapacity(fl))} boxes`))),
     h('div', { id: 'needs-wrap', 'data-sig': needsSig(fixes) }, needsAttention(st, fixes)),
     h('div', { class: 'floor-layout' },
-      h('div', { class: 'stack', style: { minWidth: 0 } }, siteTabs, newSite ? null : tools, appEl, help, legend()),
+      h('div', { class: 'stack', style: { minWidth: 0 } }, siteTabs, newSite ? null : tools, appEl, placeBar(st, v, newSite), help, legend()),
       h('aside', { class: 'stack' + (asSheet(v, newSite) ? ' sheet' : '') + (v.sheetOpen ? ' open' : ''), 'aria-label': editing() ? 'Cell blueprint' : newSite ? 'Construction' : 'Inspector', id: 'inspector' }, newSite ? movePanel(st) : editing() ? editorPanel(st) : inspector(st, v))),
     equipmentTable(st, v));
 }
@@ -88,6 +130,17 @@ function setMode(m) {
   const v = vs(); v.mode = m; if (m !== 'place') v.placing = null; if (m !== 'move') v.moving = null;
   announce(modeText(v), 'polite', false); rerender({}); document.getElementById('floor-app')?.focus();
 }
+// On a touch screen, putting something down is a decision: the ghost follows the finger, and nothing is bought until Place here.
+function placeBar(st, v, newSite) {
+  if (!touchUI() || newSite || !isGhost(v)) return null;
+  const moving = v.mode === 'move', what = moving ? objectLabel(st, st.floor.objects.find(o => o.id === v.moving) || { kind: 'item' }) : v.placing.label;
+  return h('div', { class: 'place-bar', role: 'group', 'aria-label': 'Placement' },
+    h('span', { class: 'place-what' }, `${moving ? 'Moving' : 'Placing'} ${what}`),
+    h('div', { class: 'row' },
+      h('button', { type: 'button', class: 'primary', 'data-key': 'place-here', onclick: () => primary(st, v) }, moving ? 'Move here' : 'Place here'),
+      h('button', { type: 'button', 'data-key': 'place-rotate', onclick: () => { v.rot = (v.rot + 1) % 4; announce(`Rotated to ${v.rot * 90} degrees.`, 'polite', false); speakCursor(st, v); } }, 'Rotate'),
+      h('button', { type: 'button', 'data-key': 'place-cancel', onclick: () => cancel(v) }, 'Cancel')));
+}
 function legend() {
   return h('div', { class: 'legend', 'aria-label': 'Legend' },
     h('span', null, h('i', { style: { background: 'repeating-linear-gradient(-45deg, var(--hazard) 0 3px, var(--hazard-ink) 3px 6px)' } }), 'Safety zone'),
@@ -100,10 +153,54 @@ function legend() {
 
 // ---------- canvas input
 function wireCanvas(el, st, v, view) {
+  let lastTouch = -1e9;
   const toTile = e => { const r = canvas.getBoundingClientRect(); return screenToTile(view, (e.clientX - r.left) / r.width * view.W, (e.clientY - r.top) / r.height * view.H); };
-  canvas.addEventListener('pointermove', e => { const [x, y] = toTile(e); if (x === v.cx && y === v.cy) return; v.cx = x; v.cy = y; if (dragging && (v.mode === 'zone' || (v.mode === 'place' && v.placing?.repeat))) primary(st, v, true); });
-  canvas.addEventListener('pointerdown', e => { if (e.button === 2) return; el.focus(); const [x, y] = toTile(e); v.cx = x; v.cy = y; dragging = true; primary(st, v); });
-  canvas.addEventListener('contextmenu', e => { e.preventDefault(); cancel(v); });
+  canvas.addEventListener('pointermove', e => { if (e.pointerType === 'touch') return; const [x, y] = toTile(e); if (x === v.cx && y === v.cy) return; v.cx = x; v.cy = y; if (dragging && (v.mode === 'zone' || (v.mode === 'place' && v.placing?.repeat))) primary(st, v, true); });
+  canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') return; if (e.button === 2) return; el.focus(); const [x, y] = toTile(e); v.cx = x; v.cy = y; dragging = true; primary(st, v); });
+  canvas.addEventListener('contextmenu', e => { e.preventDefault(); if (performance.now() - lastTouch > 1500) cancel(v); }); // a long press is not a right click
+  el.addEventListener('scroll', () => { v.scrollX = el.scrollLeft; v.scrollY = el.scrollTop; }, { passive: true });
+  // ---- touch: one finger pans (or paints, or moves the ghost, depending on the tool), a tap selects, two fingers pan and zoom
+  const pts = new Map(); let pinch = null;
+  canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch') return;
+    e.preventDefault(); lastTouch = performance.now();
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, l0: el.scrollLeft, t0s: el.scrollTop, t0: performance.now(), moved: false, dead: false });
+    if (pts.size === 2) { // a second finger: stop whatever the first began and start a pinch
+      const [a, b] = [...pts.values()]; dragging = false; for (const q of pts.values()) q.dead = true;
+      pinch = { d0: dist(a, b), z0: v.zoom, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; return;
+    }
+    if (pts.size > 2 || pinch) return;
+    if (isPaint(v) || isGhost(v)) {
+      const [x, y] = toTile(e); v.cx = x; v.cy = y; el.focus({ preventScroll: true });
+      if (isPaint(v)) { dragging = true; primary(st, v); } else speakCursor(st, v);
+    }
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'touch') return;
+    const p = pts.get(e.pointerId); if (!p) return; p.x = e.clientX; p.y = e.clientY;
+    if (pinch) {
+      const [a, b] = [...pts.values()], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      zoomTo(pinch.z0 * dist(a, b) / pinch.d0, mx, my);
+      el.scrollLeft -= mx - pinch.mx; el.scrollTop -= my - pinch.my; pinch.mx = mx; pinch.my = my; return;
+    }
+    if (pts.size !== 1 || p.dead) return;
+    if (isPaint(v) || isGhost(v)) {
+      const [x, y] = toTile(e); if (x === v.cx && y === v.cy) return; v.cx = x; v.cy = y;
+      if (isPaint(v)) { if (dragging) primary(st, v, true); } else speakCursor(st, v);
+      return;
+    }
+    const dx = p.x - p.sx, dy = p.y - p.sy;      // Select and the cell designer: a drag pans, a tap acts
+    if (!p.moved && Math.hypot(dx, dy) > TAP_PX) p.moved = true;
+    if (p.moved) { el.scrollLeft = p.l0 - dx; el.scrollTop = p.t0s - dy; }
+  });
+  const touchEnd = e => {
+    if (e.pointerType !== 'touch') return;
+    const p = pts.get(e.pointerId); if (!p) return; pts.delete(e.pointerId);
+    if (pinch) { if (pts.size < 2) { pinch = null; announceZoom(); } for (const q of pts.values()) q.dead = true; return; }
+    if (p.dead || e.type !== 'pointerup' || isPaint(v) || isGhost(v) || p.moved || performance.now() - p.t0 >= TAP_MS) return;
+    const [x, y] = toTile(e); v.cx = x; v.cy = y; el.focus({ preventScroll: true }); primary(st, v);   // a tap
+  };
+  canvas.addEventListener('pointerup', touchEnd); canvas.addEventListener('pointercancel', touchEnd);
   el.addEventListener('keydown', e => {
     if (navPending(e)) return; // the key after g belongs to navigation (app.js), so g m doesn't start a move
     const fl = onNewSite(st, v) ? st.move.floor : st.floor; const step = e.shiftKey ? 5 : 1;
@@ -121,7 +218,7 @@ function wireCanvas(el, st, v, view) {
 let curView = null;
 function scrollToCursor() {
   const fr = document.getElementById('floor-app'); if (!fr || !curView) return; const v = vs();
-  const [lx, ly] = tileXY(curView, v.cx + 0.5, v.cy + 0.5); const x = lx * v.pix, y = ly * v.pix, m = TILE * 2 * v.pix;
+  const [lx, ly] = tileXY(curView, v.cx + 0.5, v.cy + 0.5); const x = lx * v.zoom, y = ly * v.zoom, m = TILE * 2 * v.zoom;
   if (x < fr.scrollLeft + m) fr.scrollLeft = x - m * 2; else if (x > fr.scrollLeft + fr.clientWidth - m) fr.scrollLeft = x - fr.clientWidth + m * 2;
   if (y < fr.scrollTop + m) fr.scrollTop = y - m * 2; else if (y > fr.scrollTop + fr.clientHeight - m) fr.scrollTop = y - fr.clientHeight + m * 2;
 }
@@ -591,7 +688,17 @@ function equipmentTable(st, v) {
 }
 
 // ---------- drawing
-export function mounted() { cancelAnimationFrame(raf); const loop = () => { if (app.view !== 'floor' || !canvas?.isConnected) return; draw(); raf = requestAnimationFrame(loop); }; raf = requestAnimationFrame(loop); }
+export function mounted() {
+  const fr = document.getElementById('floor-app'), v = vs();
+  if (fr) {
+    if (v.scrollX != null) { fr.scrollLeft = v.scrollX; fr.scrollTop = v.scrollY; }
+    if (v.centerGhost && curView) {   // on a touch screen a new item starts in the middle of what is on screen
+      v.centerGhost = false;
+      const vx = (fr.scrollLeft + fr.clientWidth / 2) / v.zoom, vy = (fr.scrollTop + fr.clientHeight / 2) / v.zoom, fl = app.st.floor;
+      const [tx, ty] = screenToTile(curView, vx, vy); v.cx = Math.max(0, Math.min(fl.w - 1, tx)); v.cy = Math.max(0, Math.min(fl.h - 1, ty));
+    }
+  }
+  cancelAnimationFrame(raf); const loop = () => { if (app.view !== 'floor' || !canvas?.isConnected) return; draw(); raf = requestAnimationFrame(loop); }; raf = requestAnimationFrame(loop); }
 export function patch() {
   // light refresh: inspector + checklist only; canvas animates itself
   updateNeeds();
@@ -619,7 +726,7 @@ function drawFrame() {
     // follow the builders: centre the view on whatever is being installed (unless the player is moving the cursor)
     { const n = st.move.order.length, i = Math.floor(Math.max(0, (G.moveProgress(st) - 0.08) / 0.86) * n);
       const cur = i < n ? st.move.floor.objects.find(x => x.id === st.move.order[i]) : st.move.floor.objects.find(x => x.kind === 'dock');
-      if (cur && cur.id !== followId && performance.now() - lastKeyNav > 4000) { followId = cur.id; const [cx, cy] = center(cur); v.cx = Math.round(cx); v.cy = Math.round(cy); const fr = document.getElementById('floor-app'); if (fr) { const [lx, ly] = tileXY(view, cx + 0.5, cy + 0.5); fr.scrollLeft = lx * v.pix - fr.clientWidth / 2; fr.scrollTop = ly * v.pix - fr.clientHeight / 2; } } }
+      if (cur && cur.id !== followId && performance.now() - lastKeyNav > 4000) { followId = cur.id; const [cx, cy] = center(cur); v.cx = Math.round(cx); v.cy = Math.round(cy); const fr = document.getElementById('floor-app'); if (fr) { const [lx, ly] = tileXY(view, cx + 0.5, cy + 0.5); fr.scrollLeft = lx * v.zoom - fr.clientWidth / 2; fr.scrollTop = ly * v.zoom - fr.clientHeight / 2; } } }
     const showCursor = document.activeElement?.id === 'floor-app';
     drawScene(lc, view, st, { C: colors, t: now, anim, pallets: 0, workers: crewSprites(st, anim), build: { p: G.moveProgress(st), order: st.move.order },
       cursor: showCursor && inBounds(st.move.floor, v.cx, v.cy) ? [v.cx, v.cy] : null });
