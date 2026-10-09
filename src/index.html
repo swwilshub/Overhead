@@ -315,7 +315,7 @@ dialog.menu-sheet .dlg { position: relative; gap: 10px; padding: 16px 16px calc(
   .status.compact .clock { grid-area: clock; font-size: 0.78rem }
   .status.compact .run { grid-area: run; margin-left: 0; flex-wrap: nowrap }
   .status.compact .run button { min-width: 44px; min-height: 44px; padding: 0 8px }
-  .status.compact .alert { min-height: 36px; padding: 4px 12px }
+  .status.compact .alert { min-height: 44px; padding: 4px 12px }
   .grid2.split-inbox, .grid2.split-city, .grid2.split-nation { grid-template-columns: minmax(0, 1fr) }
   .pill { white-space: normal }
   .body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto }
@@ -346,6 +346,42 @@ dialog.menu-sheet .dlg { position: relative; gap: 10px; padding: 16px 16px calc(
   .floor-page .view-head p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
   /* toasts sit under the top bar and never hide the bottom bar or the thumbs */
   .toasts { top: calc(env(safe-area-inset-top, 0px) + 100px); bottom: auto; left: 12px; right: 12px; max-width: none }
+}
+@media (max-width: 700px), (max-height: 500px) {
+  /* tables become lists of cards (spec 009); dom.js writes the roles and each cell's column name */
+  .table-wrap table, .table-wrap thead, .table-wrap tbody, .table-wrap tr, .table-wrap td, .table-wrap th { display: block }
+  .table-wrap thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+  .table-wrap tr { padding: 8px 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2) }
+  .table-wrap td, .table-wrap th[scope="row"] { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 5px 0; border: 0; text-align: right; overflow-wrap: anywhere }
+  .table-wrap td::before { content: attr(data-label); flex: none; max-width: 45%; color: var(--muted); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; text-align: left }
+  .table-wrap td[data-label=""] { justify-content: flex-end; flex-wrap: wrap }
+  .table-wrap td[data-label=""]::before { content: none }
+  .table-wrap th[scope="row"] { justify-content: flex-start; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-weight: 800; text-align: left }
+  .table-wrap td[colspan] { display: block; text-align: left }
+  .sort-menu { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 700 }
+  .sort-menu select { flex: 1 1 200px }
+  .nation svg { max-height: none }
+  /* the Catalog's tabs are one row that scrolls sideways, with a fade where there is more */
+  .cat-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent) }
+  .cat-tabs::-webkit-scrollbar { display: none }
+  .cat-tabs [role=tab] { flex: none }
+}
+/* finger-sized targets on touch screens, at any width (spec 009) */
+@media (pointer: coarse) {
+  button, .btn, select, summary, [role=tab], input:not([type=checkbox]):not([type=radio]) { min-height: 44px }
+  button:not(.link):not(.sort) { min-width: 44px }
+  .link, .sort { position: relative }
+  .link::after, .sort::after { content: ""; position: absolute; inset: -12px -8px }
+  label:has(> input[type=checkbox]), label:has(> input[type=radio]) { display: flex; align-items: center; gap: 10px; min-height: 44px }
+  /* checkboxes and radios are drawn here, 44 px square, because a native one cannot be made a finger-sized target */
+  input[type=checkbox], input[type=radio] { -webkit-appearance: none; appearance: none; display: inline-grid; place-content: center; flex: none; width: 44px; height: 44px; margin: 0; border: 2px solid var(--muted); border-radius: 10px; background: var(--panel) }
+  input[type=radio] { border-radius: 50% }
+  input[type=checkbox]:checked { background: var(--accent); border-color: var(--accent) }
+  input[type=checkbox]:checked::after { content: ""; width: 11px; height: 22px; margin-top: -4px; border: solid var(--accent-ink); border-width: 0 4px 4px 0; transform: rotate(45deg) }
+  input[type=radio]:checked { border-color: var(--accent) }
+  input[type=radio]:checked::after { content: ""; width: 20px; height: 20px; border-radius: 50%; background: var(--accent) }
+  input[type=checkbox]:disabled, input[type=radio]:disabled { opacity: 0.5 }
+  .lot { width: 44px; height: 44px }
 }
 @media (min-width: 701px) and (max-height: 500px) {
   .status.compact { grid-template-columns: minmax(0, 1fr) auto auto auto auto; grid-template-areas: "brand cash alert clock run"; gap: 2px 16px }

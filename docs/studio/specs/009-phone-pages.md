@@ -21,15 +21,16 @@ As a player on a phone, I read and use every screen without scrolling sideways o
 1. **Tables become lists of cards.** In compact mode every table shows each row as a card: the row's first cell as its
    title and each other cell as "Label: value", with the row's buttons at the bottom. The table keeps its table
    semantics for screen readers (row and column headers are still announced). No table scrolls sideways.
-2. **Sorting still works.** A table that can be sorted shows a "Sort by" menu above its cards in compact mode, with the
-   same columns and direction.
-3. **Nation page.** In compact mode the map is shown full width above the city card, and each city is also chosen from
-   the list below as today, so no dot has to be hit with a fingertip. The page does not scroll sideways.
-4. **Big enough to tap.** On coarse screens every button, tab, link, select and checkbox that is on its own or in a
-   list is at least 44 px high and 44 px wide, or has a 44 px tap area (padding or a hit box that is not visible).
-   The only exceptions are controls inside running text and the hidden skip link.
+2. **Sorting still works.** A table that can be sorted shows a "Sort by" menu above its cards in compact mode, listing
+   each column both ways ("Metro population, high to low", "City, A to Z"). The header sort buttons are not rendered
+   in that layout, so nothing hidden can take focus.
+3. **Nation page.** In compact mode the map is a full-width picture above the city card (not a set of controls), and
+   each city is chosen from the list below, so no dot has to be hit with a fingertip. The page does not scroll sideways.
+4. **Big enough to tap.** On coarse screens every button, tab, link, select, slider, checkbox and radio is at least 44 px
+   high and wide, or has a 44 px tap area (an invisible hit box around a text link). Checkboxes and radios are drawn by
+   the page at 44 px for this. The only exception is the hidden skip link.
 5. **Catalog tabs scroll in one row** in compact mode, with the selected tab kept in view and a fade at the edge that
-   shows more are there.
+   shows more are there. (The city map's building cells are 44 px on coarse screens too.)
 6. **No sideways scroll anywhere.** At 320, 360, 390 and 430 px wide, the page and every section have no horizontal
    scroll, on every screen of the game.
 

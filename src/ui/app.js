@@ -1,5 +1,6 @@
 // App shell: status bar, navigation, the run loop, refresh with focus preservation.
 import { h, frag, announce, prefs, dialog, confirmBox, captureFocus, restoreFocus } from './dom.js';
+import { isCompact, COMPACT_QUERY, compactMq } from './compact.js';
 import * as G from '../sim/game.js';
 import { fmtDate, fmtTime, money, moneyShort, minuteOfDay, isWorkday, MIN_PER_DAY, monthKey, weekday } from '../core/util.js';
 import { WORK_START, WORK_END, isWhite } from '../sim/people.js';
@@ -19,9 +20,7 @@ export const NAV = [
   ['Game', [['options', 'Options & help']]],
 ];
 // Phones, in portrait and landscape: a slim top bar, a bottom bar and a Menu sheet replace the side menu (spec 007).
-export const COMPACT_QUERY = '(max-width: 700px), (max-height: 500px)';
-const compactMq = window.matchMedia(COMPACT_QUERY);
-export const isCompact = () => compactMq.matches;
+export { isCompact, COMPACT_QUERY };
 compactMq.addEventListener('change', () => { closeMenu(); render({}); });
 const NAV_KEYS = { f: 'floor', c: 'catalog', d: 'research', s: 'staff', h: 'hire', i: 'inbox', p: 'purchasing', l: 'sales', b: 'bank', r: 'reports', m: 'city', n: 'nation', o: 'options' };
 

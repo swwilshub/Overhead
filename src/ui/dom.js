@@ -1,3 +1,4 @@
+import { isCompact } from './compact.js';
 // Tiny DOM toolkit: element builder, announcements, dialogs, tables.
 
 export function h(tag, attrs, ...kids) {
@@ -175,24 +176,33 @@ export function table(caption, cols, rows, opts = {}) {
   const sorted = [...rows];
   const col = cols.find(c => c.key === st.key);
   if (col) { const f = col.sort || (r => r[col.key]); sorted.sort((a, b) => { const x = f(a), y = f(b); return (x > y ? 1 : x < y ? -1 : 0) * st.dir; }); }
-  const thead = h('thead', null, h('tr', null, cols.map(c => {
+  // On a phone each row is a card (CSS). A table whose display is changed can lose its meaning for assistive technology,
+  // so in that layout the roles are written out, and each cell carries its column's name for the card to show.
+  const cards = isCompact(), role = r => cards ? { role: r } : {};
+  const thead = h('thead', role('rowgroup'), h('tr', role('row'), cols.map(c => {
     const sortable = opts.onSort && c.sortable !== false;
     const aria = st.key === c.key ? (st.dir > 0 ? 'ascending' : 'descending') : (sortable ? 'none' : null);
-    if (!c.label) return h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Actions'));
-    return h('th', { scope: 'col', class: c.num ? 'n' : '', 'aria-sort': aria }, sortable ? h('button', { class: 'sort', type: 'button', 'data-key': 'sort-' + c.key, onclick: () => opts.onSort({ key: c.key, dir: st.key === c.key ? -st.dir : (c.num ? -1 : 1) }) }, c.label, st.key === c.key ? (st.dir > 0 ? ' ▲' : ' ▼') : '') : c.label);
+    if (!c.label) return h('th', { scope: 'col', ...role('columnheader') }, h('span', { class: 'sr-only' }, 'Actions'));
+    return h('th', { scope: 'col', class: c.num ? 'n' : '', 'aria-sort': aria, ...role('columnheader') }, sortable && !cards ? h('button', { class: 'sort', type: 'button', 'data-key': 'sort-' + c.key, onclick: () => opts.onSort({ key: c.key, dir: st.key === c.key ? -st.dir : (c.num ? -1 : 1) }) }, c.label, st.key === c.key ? (st.dir > 0 ? ' ▲' : ' ▼') : '') : c.label);
   })));
-  const tbody = h('tbody', null, sorted.map(r => {
-    const tr = h('tr', { class: opts.rowClass ? opts.rowClass(r) : '' }, cols.map((c, i) => {
+  const tbody = h('tbody', role('rowgroup'), sorted.map(r => {
+    const tr = h('tr', { class: opts.rowClass ? opts.rowClass(r) : '', ...role('row') }, cols.map((c, i) => {
       const v = c.render ? c.render(r) : r[c.key];
-      return i === 0 && opts.rowHeader !== false ? h('th', { scope: 'row', class: c.num ? 'n' : '', style: { textTransform: 'none', letterSpacing: 0, fontSize: 'inherit', color: 'inherit' } }, v) : h('td', { class: c.num ? 'n' : '' }, v);
+      return i === 0 && opts.rowHeader !== false ? h('th', { scope: 'row', class: c.num ? 'n' : '', style: { textTransform: 'none', letterSpacing: 0, fontSize: 'inherit', color: 'inherit' }, ...role('rowheader') }, v) : h('td', { class: c.num ? 'n' : '', 'data-label': c.label || '', ...role('cell') }, v);
     }));
     const first = tr.cells[0], marked = [...tr.querySelectorAll('[data-rowname]')], labels = marked.length ? marked : [first];
     if (first) for (const b of tr.querySelectorAll('button')) if (!first.contains(b) && !b.hasAttribute('aria-label') && !b.hasAttribute('aria-labelledby')) nameBy(b, ...labels);
     return tr;
   }));
-  if (!rows.length) tbody.append(h('tr', null, h('td', { colspan: cols.length, class: 'muted' }, opts.empty || 'Nothing here yet.')));
+  if (!rows.length) tbody.append(h('tr', role('row'), h('td', { colspan: cols.length, class: 'muted', ...role('cell') }, opts.empty || 'Nothing here yet.')));
+  // cards have no header row to click, so a sortable table offers a menu instead
+  const sortCols = opts.onSort ? cols.filter(c => c.label && c.sortable !== false) : [];
+  const menu = cards && sortCols.length ? h('label', { class: 'sort-menu' }, h('span', null, 'Sort by'),
+    h('select', { 'data-key': 'sort-menu', onchange: e => { const [key, dir] = e.target.value.split(':'); opts.onSort({ key, dir: +dir }); } },
+      sortCols.flatMap(c => [[c, c.num ? -1 : 1], [c, c.num ? 1 : -1]]).map(([c, d]) => h('option', { value: `${c.key}:${d}`, selected: st.key === c.key && st.dir === d },
+        `${c.label}, ${c.num ? (d > 0 ? 'low to high' : 'high to low') : (d > 0 ? 'A to Z' : 'Z to A')}`)))) : null;
   return h('div', { class: 'table-wrap', tabindex: opts.scrollable ? 0 : null, role: opts.scrollable ? 'region' : null, 'aria-label': opts.scrollable ? caption : null },
-    h('table', null, caption ? h('caption', { class: opts.hideCaption ? 'sr-only' : '' }, caption) : null, thead, tbody));
+    menu, h('table', cards ? { role: 'table' } : null, caption ? h('caption', { class: opts.hideCaption ? 'sr-only' : '' }, caption) : null, thead, tbody));
 }
 
 export function meter(v, label) {

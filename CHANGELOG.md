@@ -4,6 +4,10 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- Phone layout, part 4: every page fits. Tables become lists of cards, each value labelled with its column, with a Sort
+  by menu in place of the column headers (screen readers still hear a table). The Nation page shows the map full width
+  above the city card and you pick a city from the list. The Catalog's tabs are one row you can swipe. On touch
+  screens buttons, tabs, links, sliders, checkboxes and the city map's buildings are all at least finger-sized.
 - Phone layout, part 3: the floor works with a finger. Drag to look around, pinch to zoom (a quarter to four times),
   tap a machine to select it, and use Fit to see the whole plant. Painting zones and laying conveyor still work by
   dragging. When you place or move something, the outline follows your finger and nothing is bought until you press
