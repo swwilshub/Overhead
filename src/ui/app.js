@@ -96,7 +96,7 @@ function statusBar() {
       h('div', { class: 'fig' }, h('span', null, 'Net worth'), h('span', { id: 'st-nw' }, moneyShort(G.netWorth(st)))),
       st.city ? h('div', { class: 'fig' }, h('span', null, 'City'), h('span', null, st.city.name)) : null),
     inGame() ? runControls() : null,
-    alertSlot());
+    alertSlot()));
   return bar;
 }
 // The "N setup issues" button lives in the status bar, which render() rebuilds. It is built there (not added later by

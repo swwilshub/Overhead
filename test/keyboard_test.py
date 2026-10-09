@@ -191,7 +191,7 @@ async def main():
         await pg.keyboard.press(']'); await pg.wait_for_timeout(1300)
         async def tab_to_alert():
             await pg.evaluate("() => { document.activeElement.blur(); document.body.focus(); }")
-            for _ in range(30):
+            for _ in range(90):   # the Needs attention buttons and the whole floor come before the status bar in Tab order
                 await pg.keyboard.press('Tab')
                 if (await active(pg))['key'] == 'st-alert': return True
             return False

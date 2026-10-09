@@ -82,7 +82,7 @@ for (const f of FAMILIES) {
   const l = objectLabel(st, { kind: 'cell', family: f.id, id: 9 });
   ok(!/cell cell|line cell|shop machine/i.test(l) && l === `${cellName(f.id)} #9`, `cell label ${l}`);
 }
-const handMade = find(/[Mm]achine #\$\{|cell #\$\{|#\$\{[^}]*\} input|'#' \+ [a-z.]*id\b/).filter(l => !/case 'machine': return/.test(l));
+const handMade = find(/[Mm]achine #\$\{|cell #\$\{|#\$\{[^}]*\} input|'#' \+ [a-z.]*id\b/).filter(l => !/case 'machine': return/.test(l) && !/data-autoid/.test(l)); // dom.js builds a focus key from an element id, not a label
 ok(!handMade.length, `no hand-built "Machine #" or "#\${id} input" labels${handMade.length ? ': ' + handMade.slice(0, 3).join(' | ') : ''}`);
 
 // ---- criterion 2: the floor markers stay the same for the renamed statuses
