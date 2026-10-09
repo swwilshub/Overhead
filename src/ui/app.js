@@ -96,9 +96,17 @@ function statusBar() {
       h('div', { class: 'fig' }, h('span', null, 'Net worth'), h('span', { id: 'st-nw' }, moneyShort(G.netWorth(st)))),
       st.city ? h('div', { class: 'fig' }, h('span', null, 'City'), h('span', null, st.city.name)) : null),
     inGame() ? runControls() : null,
-    h('span', { id: 'st-alert' })));
+    alertSlot());
   return bar;
 }
+// The "N setup issues" button lives in the status bar, which render() rebuilds. It is built there (not added later by
+// updateStatus) and has a data-key, so focus on it survives a full render; updateStatus patches its text in place.
+const issueText = n => `${n} issue${n > 1 ? 's' : ''}`;
+function alertSlot() {
+  const n = setupProblems(app.st).length;
+  return h('span', { id: 'st-alert', 'data-v': n ? issueText(n) : '' }, n ? alertButton(issueText(n)) : null);
+}
+const alertButton = text => h('button', { class: 'alert', type: 'button', 'data-key': 'st-alert', onclick: () => go('floor') }, text);
 function clockText() {
   const st = app.st; const m = minuteOfDay(st.time);
   const shift = isWorkday(st.time) && m >= WORK_START && m < WORK_END ? 'Shift running' : 'Plant closed';
@@ -136,8 +144,19 @@ function updateStatus() {
   const al = document.getElementById('st-alert');
   if (al) {
     const n = setupProblems(st).length;
-    const want = n ? `${n} issue${n > 1 ? 's' : ''}` : '';
-    if (al.dataset.v !== want) { al.dataset.v = want; al.replaceChildren(n ? h('button', { class: 'alert', type: 'button', onclick: () => go('floor') }, want) : ''); }
+    const want = n ? issueText(n) : '';
+    if (al.dataset.v !== want) {
+      al.dataset.v = want;
+      const btn = al.querySelector('button');
+      if (btn && n) btn.textContent = want; // same element, so focus stays on it
+      else if (n) al.replaceChildren(alertButton(want));
+      else {
+        // the last issue is fixed: if the button has focus, hand it to its neighbour in the bar instead of the page body
+        const had = btn && document.activeElement === btn;
+        al.replaceChildren();
+        if (had) document.querySelector('.status [data-key="mute"], .status [data-key="runto"]')?.focus({ preventScroll: true });
+      }
+    }
   }
   updateNavBadges();
 }

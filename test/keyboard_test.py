@@ -179,6 +179,35 @@ async def main():
         a = await active(pg); ok(a['text'] == 'See vendors', f'focus stays on See vendors across redraws ({a["text"]!r})')
         await axe(pg, 'Purchasing')
 
+        # a real failure stays assertive: every vendor of one item is sold out for the month
+        await pg.evaluate("() => { const O = window.__overhead, st = O.app.st, id = [...O.G.ownInputs(st)][0]; st.targets = { [id]: 100000 }; for (const f of st.city.firms) st.vendorBought[f.id + ':' + id] = 1e9; }")
+        await pg.focus('[data-key="pur-all"]'); await pg.keyboard.press('Enter'); await pg.wait_for_timeout(700)
+        bad = await pg.locator('#live-assertive').text_content(); calm = await pg.locator('#live-polite').text_content()
+        ok('left this month' in (bad or ''), f'a failed Purchase all is announced assertively: {bad!r} (polite: {calm!r})')
+
+        # ---- status bar: the "N setup issues" button, reached with real Tab, keeps focus (see the QA finding on spec 004)
+        await nav(pg, 'floor')
+        await pg.evaluate("() => { const st = window.__overhead.app.st; st.employees.forEach(e => { e.assign = null; }); }")
+        await pg.keyboard.press(']'); await pg.wait_for_timeout(1300)
+        async def tab_to_alert():
+            await pg.evaluate("() => { document.activeElement.blur(); document.body.focus(); }")
+            for _ in range(30):
+                await pg.keyboard.press('Tab')
+                if (await active(pg))['key'] == 'st-alert': return True
+            return False
+        ok(await tab_to_alert(), 'Tab reaches the setup issues button in the status bar')
+        n0 = (await pg.locator('[data-key="st-alert"]').text_content())
+        await pg.evaluate("() => { window.__overhead.app.st.strike = true; }")   # one more issue while the clock runs
+        await pg.wait_for_timeout(400)
+        n1 = (await pg.locator('[data-key="st-alert"]').text_content()); a = await active(pg)
+        ok(n1 != n0 and a['key'] == 'st-alert', f'count changed ({n0!r} -> {n1!r}) and focus stayed on the button ({a["key"]!r})')
+        await nav(pg, 'floor'); await pg.keyboard.press('g'); await pg.keyboard.press('p'); await pg.wait_for_timeout(300)
+        ok(await tab_to_alert(), 'Tab reaches the button on Purchasing with the clock running')
+        await pg.wait_for_timeout(3500)   # several full redraws of a live view
+        a = await active(pg); ok(a['key'] == 'st-alert', f'focus stayed on the button across full redraws ({a["key"] or a["tag"]!r})')
+        await pg.evaluate("() => { const st = window.__overhead.app.st; st.strike = false; st.employees.forEach(e => { e.assign = e.assign ?? st.floor.objects.find(o => o.kind === 'office' || o.kind === 'machine')?.id ?? null; }); }")
+        await pg.keyboard.press('['); await pg.wait_for_timeout(300)
+
         # ---- In-basket: Mark all read
         await nav(pg, 'inbox')
         await enter_keeps(pg, '[data-key="memo-readall"]', 'Mark all read')

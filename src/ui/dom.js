@@ -145,6 +145,13 @@ export function restoreFocus(snap, scope) {
   return false;
 }
 
+// For a dialog or any async step that may outlive a redraw: `const back = rememberFocus(); await confirmBox(...); back();`
+// puts focus back on the control that opened it, or the nearest one if a redraw replaced it.
+export function rememberFocus() {
+  const root = document.getElementById('app'), snap = captureFocus(root);
+  return () => restoreFocus(snap, root);
+}
+
 // ---- distinct names for a control repeated down a list or table
 // The accessible name is the control's own visible text, then the text of `labels` (its row header, say), through
 // aria-labelledby, so it follows whatever those elements say. A comma that is heard but not seen (the CSS class

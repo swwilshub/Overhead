@@ -30,7 +30,7 @@ export const purchasing = {
       h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Purchasing'), h('p', null, staffed ? 'Purchasing staff reorder stock up to the targets below every morning.' : `Nobody does the buying, so stock only gets reordered when you do it. ${aOrAn(jobFor('purchasing').title, true)} would handle it every morning.`)),
         h('div', { class: 'row' }, h('button', { type: 'button', 'data-key': 'pur-suggest', onclick: () => { st.targets = G.suggestedTargets(st); act({ ok: true, msg: 'Targets set to about three days of use.' }); } }, 'Suggest targets'),
           // focus stays on the button, so the polite message is the only sign it worked, whether or not anything was ordered
-          h('button', { class: 'primary', type: 'button', 'data-key': 'pur-all', onclick: () => { const r = G.purchaseAll(st); announce(r.msg, 'polite'); act(r, true, 'order'); } }, 'Purchase all to target'))),
+          h('button', { class: 'primary', type: 'button', 'data-key': 'pur-all', onclick: () => { const r = G.purchaseAll(st); announce(r.msg, r.ok || r.msg === 'Stock is already at target levels.' ? 'polite' : 'assertive'); act(r, true, 'order'); } }, 'Purchase all to target'))),
       h('section', { class: 'card' }, kv([['Storage', `${num(stored)} of ${num(cap)} boxes (${pct(stored / cap)})`], ['On order', `${num(G.allOnOrder(st))} boxes`], ['Room left for orders', `${num(G.roomForOrders(st))} boxes (15% is held back for finished goods)`]])),
       h('section', { class: 'card' }, h('h2', null, 'Stock and targets'),
         table('Materials and components', [
