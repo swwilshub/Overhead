@@ -391,7 +391,7 @@ async function layBelt(st, from, to, k) {
 }
 
 // ---------- boxes on belts, at machines and in people's hands, all drawn from the simulation's own state
-const belt = { st: null, tag: '', dirs: new Map(), live: new Set(), lastPiles: [] };
+const belt = { st: null, tag: '', dirs: new Map(), live: new Set(), lastPiles: [], drawMs: [] };
 export function beltDebug() { return belt; }
 function beltFrame(st, now, anim) {
   G.refreshLanes(st); // belts laid while the clock is stopped get their lanes straight away
@@ -546,7 +546,9 @@ function readColors() {
   colorsAt = performance.now();
 }
 let lo = null;
-function draw() {
+// draw times of the last 120 frames, read by the performance test through the test hook
+function draw() { const t0 = performance.now(); drawFrame(); belt.drawMs.push(performance.now() - t0); if (belt.drawMs.length > 120) belt.drawMs.shift(); }
+function drawFrame() {
   const st = app.st; if (!st?.floor || !curView) return;
   if (!colors || performance.now() - colorsAt > 1500) readColors();
   const v = vs(), fl = st.floor, view = curView;
@@ -585,7 +587,7 @@ function draw() {
   c.drawImage(lo, 0, 0, canvas.width, canvas.height);
 }
 // a building crew in hard hats around whatever is being installed at the new site
-const crew = [101, 102, 103, 104].map((id, i) => ({ id, job: [14, 13, 5, 14][i], hat: true, px: null, py: null, tx: null, ty: null }));
+const crew = [101, 102, 103, 104].map((id, i) => ({ id, job: ['line_worker', 'mechanic', 'supervisor', 'line_worker'][i], hat: true, px: null, py: null, tx: null, ty: null }));
 function crewSprites(st, anim) {
   const mv = st.move, n = mv.order.length, p = G.moveProgress(st);
   const i = Math.floor(Math.max(0, (p - 0.08) / 0.86) * n);

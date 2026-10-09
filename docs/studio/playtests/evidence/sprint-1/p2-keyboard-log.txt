@@ -1,0 +1,35 @@
+Keyboard-only session, Quick start (Buffalo, NY), build b2dc2d6. Focus = document.activeElement after each key.
+
+-- Floor grid has focus (#floor-app), then: g, h
+floor g h: DIV#floor-app ... Select mode.   h1 still "FACTORY FLOOR"   (no navigation)
+-- Floor grid has focus, Space / ] / ?
+Space -> polite "Selected Conveyor belt. Press I for details, M to move, Delete to sell."   clock still "7:00 AM · Plant closed"
+]     -> no change      ?  -> h1 still "FACTORY FLOOR"
+-- Same keys with focus on a header button: g h -> H1 "HIRING" (works)
+
+-- Hiring: focus "Place ad ($300)" in the Plant Mechanic row, Enter
+after ad: BODY (focus lost; next Tab goes to "Skip to the work area")
+polite: "Ad placed for Plant Mechanic ($300). Resumes will arrive in the In-basket over the next week."
+-- Purchasing: Enter on "Suggest targets" -> BODY ; Enter on "Purchase all to target" -> BODY (no new announcement)
+-- Cell editor: Enter on "Standard layout" -> BODY
+-- In-basket: Enter on a memo -> H2 memo heading; next Tab -> "Skip to the work area" (back to top of page)
+
+-- Machine inspector after Enter + I on a machine: Tab order
+H2 "COIL WINDING LINE MACHINE #5" -> SELECT#mach-op -> Assign -> SELECT#mach-prod -> Retool -> Move -> Return for refund
+-> Select -> Select -> BODY -> Skip link ...
+(Inspector shows "No operator" while #mach-op value is "Luis Martinez (Line Worker)")
+
+-- Conveyor mode, Enter on squares (polite region after each key, 300 ms apart)
+Enter      | Conveyor belt placed for $140.
+ArrowRight | Column 8, row 14: Empty floor. Placement OK.
+Enter      | Conveyor belt placed for $140.
+ArrowRight | Column 9, row 14: Safety zone, input 2 (Enamel paint) of Die-casting cell machine #7. Placement OK.
+Enter      | Column 9, row 14: Safety zone, input 2 (Enamel paint) of Die-casting cell machine #7. Placement OK.
+           (belt was placed: a toast showed it, the polite region did not)
+Belt squares are announced as "Conveyor belt, belt not connected to any machine" with no direction.
+R on a selected belt: no announcement and no change to the belt.
+
+-- Cell editor announcements
+"Building a Die-casting cell cell. Step 1 of 3: ..."
+Panel heading: "DIE-CASTING CELL CELL", later "DIE-CASTING CELL CELL #11"; equipment row "Die-casting cell cell #11"
+After "Confirm and build" with $73,796 in checking: assertive "Overdraft: $19,024 drawn on credit." (no warning before)

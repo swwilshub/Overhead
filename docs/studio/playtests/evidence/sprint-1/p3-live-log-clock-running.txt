@@ -1,0 +1,8 @@
+polite: Clock running, faster speed.
+polite: Shipped 200 Aluminum frame for $6,168.
+polite: Shipped 216 Aluminum frame for $6,661.
+polite: Shipped 64 Aluminum frame for $1,974.
+polite: Payday: $1,759 paid to staff.
+assertive: New memo from Plant manager: Machine #5 broke down
+assertive: Clock paused: an urgent memo arrived.
+polite: Clock paused.

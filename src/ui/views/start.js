@@ -70,7 +70,7 @@ function savesCard() {
   const fileIn = h('input', { type: 'file', accept: '.json,application/json', id: 'import-file', onchange: async e => {
     const f = e.target.files[0]; if (!f) return;
     try { const st = JSON.parse(await f.text()); if (!st.setup || !st.bank) throw new Error('not a save'); app.st = G.migrate(st); announce(`Loaded ${st.setup.company}.`); go(st.phase === 'play' ? 'floor' : st.phase); }
-    catch { announce("That file isn't an Overhead save.", 'assertive'); }
+    catch (e) { announce(/newer version/.test(e?.message) ? e.message : "That file isn't an Overhead save.", 'assertive'); }
   } });
   const rows = saves ? Object.values(saves).sort((a, b) => b.savedAt - a.savedAt) : [];
   return h('section', { class: 'card', 'aria-labelledby': 'saves-h' }, h('h2', { id: 'saves-h' }, 'Saved games'),
@@ -87,7 +87,8 @@ function savesCard() {
 async function loadSlot(slot) {
   const st = await loadGame(slot);
   if (!st) { announce('That save could not be read.', 'assertive'); return; }
-  app.st = G.migrate(st); app.speed = 0; announce(`Loaded ${st.setup.company}, ${fmtDate(st.time)}.`);
+  try { app.st = G.migrate(st); } catch (e) { announce(e.message, 'assertive'); return; }
+  app.speed = 0; announce(`Loaded ${st.setup.company}, ${fmtDate(st.time)}.`);
   go(st.phase === 'play' ? 'floor' : st.phase === 'city' ? 'city' : 'nation');
 }
 

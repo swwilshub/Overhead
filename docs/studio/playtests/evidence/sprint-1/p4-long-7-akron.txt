@@ -1,0 +1,31 @@
+Feb 1, 1998 NW    $222,521 cash   $136,966 sales   $34,515 exp  $125,484 made    7834 staff 3 mach 1 eff 0.74
+Mar 1, 1998 NW    $218,964 cash   $131,856 sales   $61,088 exp   $66,197 made    6731 staff 3 mach 1 eff 0.75
+Apr 1, 1998 NW    $213,059 cash   $128,410 sales   $67,120 exp   $72,382 made    7070 staff 3 mach 1 eff 0.65
+May 1, 1998 NW    $230,538 cash    $55,974 sales   $88,803 exp  $166,785 made   20192 staff 6 mach 2 eff 0.70
+Jun 1, 1998 NW    $257,133 cash    $63,687 sales  $142,192 exp  $117,763 made   22671 staff 6 mach 2 eff 0.69
+Jul 1, 1998 NW    $279,903 cash    $98,276 sales  $146,566 exp  $127,489 made   23407 staff 6 mach 2 eff 0.66
+Aug 1, 1998 NW    $310,986 cash   $134,392 sales  $151,729 exp  $109,415 made   24904 staff 6 mach 2 eff 0.69
+Sep 1, 1998 NW    $335,570 cash   $153,760 sales  $145,122 exp  $130,086 made   22878 staff 6 mach 2 eff 0.32
+    Move to 422 Liberty Ave. under way: about 4 days.
+Oct 1, 1998 NW    $326,664 cash   $151,203 sales  $152,917 exp  $151,600 made   23792 staff 6 mach 2 eff 0.69
+Nov 1, 1998 NW    $377,355 cash   $107,602 sales  $192,320 exp  $229,786 made   30561 staff 9 mach 3 eff 0.38
+Dec 1, 1998 NW    $428,151 cash   $149,012 sales  $211,959 exp  $180,923 made   31610 staff 9 mach 3 eff 0.09
+Jan 1, 1999 NW    $481,374 cash   $232,301 sales  $248,977 exp  $167,852 made   33767 staff 9 mach 3 eff 0.51
+Feb 1, 1999 NW    $569,227 cash   $156,251 sales  $264,419 exp  $316,286 made   36553 staff 11 mach 4 eff 0.40
+Mar 1, 1999 NW    $643,248 cash   $223,267 sales  $266,277 exp  $194,981 made   32092 staff 11 mach 4 eff 0.62
+Apr 1, 1999 NW    $751,950 cash   $353,720 sales  $364,273 exp  $263,705 made   43782 staff 11 mach 4 eff 0.56
+May 1, 1999 NW    $853,455 cash   $433,533 sales  $338,970 exp  $245,156 made   40237 staff 11 mach 4 eff 0.29
+Jun 1, 1999 NW    $995,580 cash   $257,850 sales  $382,850 exp  $581,989 made   36050 staff 13 mach 5 eff 0.43
+Jul 1, 1999 NW  $1,151,135 cash   $462,439 sales  $531,688 exp  $328,784 made   37601 staff 13 mach 5 eff 0.60
+Aug 1, 1999 NW  $1,349,576 cash   $416,778 sales  $557,310 exp  $577,789 made   42289 staff 14 mach 6 eff 0.59
+Sep 1, 1999 NW  $1,525,398 cash   $613,377 sales  $688,856 exp  $522,427 made   40060 staff 14 mach 6 eff 0.60
+Oct 1, 1999 NW  $1,673,198 cash   $831,952 sales  $652,862 exp  $435,683 made   39808 staff 14 mach 6 eff 0.64
+Nov 1, 1999 NW  $1,791,355 cash   $880,929 sales  $579,159 exp  $440,467 made   38318 staff 14 mach 6 eff 0.58
+Dec 1, 1999 NW  $1,900,506 cash $1,043,746 sales  $604,540 exp  $529,114 made   40179 staff 14 mach 6 eff 0.60
+Jan 1, 2000 NW  $2,038,343 cash $1,202,898 sales  $631,533 exp  $443,138 made   42719 staff 14 mach 6 eff 0.38
+over null score $2,038,343 lines Seat cushion, Steel tube frame, ABS housing, Desk lamp, Label maker, Cordless phone
+save bytes 232955 firms alive 76 / 89
+
+real	0m3.376s
+user	0m4.620s
+sys	0m0.184s

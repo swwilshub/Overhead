@@ -488,10 +488,13 @@ function techStep(st, dt) {
   }
 }
 
-// Bring older saves up to date (no older formats exist yet; kept as the place to add them).
+// Bring older saves up to date. Each format change bumps VERSION and adds a step here, oldest first, with a fixture
+// in test/fixtures/ that test/saves.mjs loads.
 export function migrate(st) {
-  if (!st || !st.floor) return st;
-  st.cellTech = st.cellTech || { done: {}, active: null };
+  if (!st) return st;
+  if ((st.v || 1) > VERSION) throw new Error(`This save comes from a newer version of the game (format ${st.v}).`);
+  if (st.floor) st.cellTech = st.cellTech || { done: {}, active: null };
+  st.v = VERSION;
   return st;
 }
 // Input squares in use by the current product that have neither a belt nor a safety zone

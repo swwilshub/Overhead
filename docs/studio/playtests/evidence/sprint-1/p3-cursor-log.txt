@@ -1,0 +1,20 @@
+Screen-reader session, Quick start (Memphis, TN), build b2dc2d6. Polite region (#live-polite) after each key.
+
+After the clock ran to Mon Jan 19, 1998 4:34 PM:
+assertive: New memo from Plant manager: Machine #5 broke down
+memo body: "Machine #5 (Die-casting cell) has stopped with a fault. Nobody on staff can fix it, so an outside crew comes first thing tomorrow."
+
+Floor grid, cursor moved over the broken machine:
+ArrowDown  Column 5, row 5: Die-casting cell machine #5.
+ArrowRight Column 6, row 5: Die-casting cell machine #5.
+ArrowDown  Column 6, row 6: Die-casting cell machine #5.
+ArrowRight Column 7, row 6: Die-casting cell machine #5.
+(no status is spoken; the inspector shows the fault only after Enter, then I)
+
+Other cursor readings:
+Column 9, row 12: input 1 (Zinc ingot) of Die-casting cell machine #7.          (before painting)
+Column 9, row 14: Safety zone, input 2 (Enamel paint) of Die-casting cell machine #7.   (after painting)
+Column 12, row 6: Conveyor belt, belt from machine #5 that doesn't reach an input or bin yet.
+
+Optimiser, Quick start with "Scenario number" set to 42:
+app.st.seed = 2515499494, city Birmingham, AL (other Quick starts: Buffalo, NY and Memphis, TN)
