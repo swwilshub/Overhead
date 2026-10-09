@@ -4,8 +4,8 @@ import { h, table, pill, kv, field } from '../dom.js';
 import { app, render as rerender } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
-import { jobFor } from '../../core/content.js';
-import { OFFICES, KINDS, ZONE_INFO, ports, inputPorts, machineTier, TIER_NAME } from '../../sim/floor.js';
+import { jobFor, aOrAn } from '../../core/content.js';
+import { OFFICES, KINDS, ZONE_INFO, ports, inputPorts, machineTier, TIER_NAME, EQUIP_NAME } from '../../sim/floor.js';
 import { unitsPerHour } from '../../sim/world.js';
 import { money, money2, num } from '../../core/util.js';
 import { startPlacing } from './floor.js';
@@ -71,7 +71,7 @@ function family(st, fid) {
         machinePreview(st, fid, r),
         h('div', { class: 'stack', style: { gap: '10px' } },
           field('Show product', sel, 'The preview and figures follow this product. A machine can switch products later by retooling.'),
-          avail ? null : h('p', null, pill('Needs research', 'warn', '!'), ` A ${jobFor('researcher').title} has to develop this product on one of these machines first.`),
+          avail ? null : h('p', null, pill('Needs research', 'warn', '!'), ` ${aOrAn(jobFor('researcher').title, true)} has to develop this product on one of these machines first.`),
           kv([
             ['Makes', `${ITEMS[r.out].name}${r.outQty > 1 ? ` (${r.outQty} per cycle)` : ''}`],
             ['Rated output', `${unitsPerHour(r.id).toFixed(1)} units an hour`],
@@ -230,8 +230,8 @@ function offices0(st) {
 function equipment(st) {
   const items = [
     ['conveyor', 'Conveyor belt', KINDS.conveyor.price, 'Run belts from a machine output to the input square of a machine that uses that product, or between a storage bin and a machine. Nobody has to carry those boxes. Each machine has one input square per material. The machine panel on the factory floor can lay belts for you.', { kind: 'conveyor', label: 'Conveyor belt', repeat: true }],
-    ['bin', 'Storage bin', KINDS.bin.price, 'Joins a belt line to the warehouse (2 × 2, must touch a belt). On an input line it feeds that material from storage; on an output line it takes goods to storage. Holds 20 boxes.', { kind: 'bin', label: 'Storage bin' }],
-    ['handcart', 'Hand cart', KINDS.handcart.price, 'Lets an operator move a pallet at a time. One cart serves about three machines.', { kind: 'handcart', label: 'Hand cart' }],
+    ['bin', 'Storage bin', KINDS.bin.price, 'Joins a belt line to storage (2 × 2, must touch a belt). On an input line it feeds that material from storage; on an output line it takes goods to storage. Holds 20 boxes.', { kind: 'bin', label: 'Storage bin' }],
+    ['handcart', EQUIP_NAME.handcart, KINDS.handcart.price, 'With a pallet jack, operators carry two boxes a trip instead of one. One pallet jack serves about three machines.', { kind: 'handcart', label: EQUIP_NAME.handcart }],
     ['forklift', 'Forklift', KINDS.forklift.price, 'Moves two stacked pallets at once, the fastest handling. Must park on forklift parking squares. One serves about four machines.', { kind: 'forklift', label: 'Forklift' }],
   ];
   return h('div', { class: 'stack' },

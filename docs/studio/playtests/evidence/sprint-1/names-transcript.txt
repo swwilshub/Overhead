@@ -1,0 +1,58 @@
+Verbatim strings met while playing (build b2dc2d6). Where: screen > place.
+
+Title > blurb: "Turn resin, steel and copper wire into motors ... toasters, tents, toys and [an office product not in the game]."
+  (no copper wire exists, and the office line does not make the last product named; materials list magnet wire)
+Title > form: "Starting money" (radio: Garage start / Family loan / Angel round / Leveraged start) and "Scenario number"
+Choose a city > status bar: "null"; table heading "All fifty cities" (42 rows)
+Lease a building > intro: "Grey dashed buildings are for rent." legend: "For rent (sign on the lot)", "P sells, C buys the selected product"
+Product market: "Producers in town", "Buyers in town"   (Buyer is also a job title)
+
+Floor > Getting started: "3. Hire a Line Worker" / "4. Give every machine an operator"
+Floor > legend: "Grey pad: operator's post"; "Workers are coloured by department"
+Floor > help: "Delete sells it."   Inspector buttons: "Return for refund" (day of purchase) / "Sell ($66,980)"
+Machine names for one machine: "Extrusion line machine #5" (floor, equipment), "EX #5" (inspector box),
+  "Machine #5" (Needs attention, memo subject), "Extrusion line #5" (belt dialog), "#10 input 1" (belt text)
+Machine number of the first machine: #5; second machine after 3 belts: #10; first office: "Cubicle #6"
+Statuses seen: "No operator", "Operator away", "Waiting for materials", "Stopped: out of Synthetic rubber.",
+  "Running", "Output blocked: belt full", "$ Selling" (output pill)
+Inspector > Operator: "Nobody", "Hire an operator" -> opens Hiring, which has no job called operator
+Cell: "Crew (0)", "Nobody yet. A cell needs at least one operator.", "Add to crew", "Add operator",
+  "Luis Martinez (Line Worker, busy elsewhere)", "This layout can use up to 1 operator."
+Cell editor: "Hatches" (cell door/input/output) vs machine "Service hatch"
+Inputs: "Input 1: Synthetic rubber · 1 per unit" vs "Input 1: Synthetic rubber (2 per 2 units)" (same panel)
+Hand-fed input: "250 units ... · 250 waiting on the belt" (no belt on that input)
+Output: "Output: ABS housing By hand to the warehouse" directly above "Belt to a belt that goes nowhere ... jammed"
+Storage: "Storage zone" (paint menu), "Storage (pallets)" (legend), "stored pallets" (placement error),
+  "storage 0 of 1,000 boxes" (floor header), "Warehouse 0 of 1,000 boxes" (Purchasing), "warehouse" (inspector)
+Catalog > Equipment: "Hand cart ... Lets an operator move a pallet at a time."  Placed item: "PALLET JACK ...
+  With a pallet jack the crew moves two boxes a trip instead of one."
+Catalog tabs: Sew, Extrude, Shop, Coils, Cast, Boards, Furniture, Lights, Appliances, Outdoor, Toys, AV, Office tech
+  headings: "CUT-AND-SEW LINE MACHINE", "MACHINE SHOP"(line), "DIE-CASTING CELL MACHINE", "HOME ELECTRONICS LINE MACHINE",
+  "OFFICE MACHINE LINE MACHINE"; floor badges EX, DC, CW, LT; inspector boxes "EX #5", "DC #11" (a cell)
+Offices: suite text "computer, storage cabinet or filing cabinet ... (+25%, +10%, +5%)"; ready-made Terminal office
+  "Adds a computer terminal: 18% more output". Checklist says "give them a desk".
+
+Hiring > Job titles: Plant Director (Front office), Finance Chief, Bookkeeper, Office Assistant (Finance),
+  Commercial Lead, Account Rep, Promotions Specialist (Commercial), Supply Lead, Buyer (Supply),
+  Shift Supervisor, Line Worker (Production), Chief Engineer, Development Engineer, Plant Mechanic (Engineering)
+  Column headers: "EST. JOB FIT"; Staff table: "SKILL"; employee card: "Skill at this job"
+Staff > Departments panel: "Finance", "Supply", "Sales effort", "Brand awareness" (no Commercial, Production,
+  Engineering, Front office)
+Sales effort: Staff "Walk-in customers only" / "Modest"; Sales page "0.35 (no sales staff)" then "0.54"
+Sales page: "or later still if Accounting falls behind."   Column "Sell it?"; inspector pill "$ Selling"
+Sales page: "Share of demand" chart 7% vs table column "SHARE OF DEMAND" 2% at the same moment
+Purchasing: "Nobody does the buying ... A Buyer would handle it every morning."
+Nav landmark (screen reader): navigation "Departments" containing Factory floor, Catalog, ... Options & help
+Employee card: Know-how "Promotion 77" (the advertising skill)
+
+Memo senders seen: Plant manager, Market research, Leasing office, Finance, Business Journal, Prairie National Bank,
+  applicant names.
+"Urgent  Getting started — Plant manager": "The building is bare. From the Catalog, buy a machine ..." (also sent in Quick start,
+  where a machine, worker, rep and materials are already in place)
+"Urgent  First order shipped — Finance" (pauses the clock; no Finance staff hired)
+"Quick start: ready to roll": "... Then add a product line that uses what this machine makes."
+"Machine #5 broke down — Plant manager": "Machine #5 (Die-casting cell) has stopped with a fault. ... an outside crew comes"
+Resume memo subjects: "Resume: Line Worker — Martha Mitchell" (new company) vs "Resume — Heather Palmer" (Quick start)
+Reports > General: "Owner: Owner" when Your name is left blank
+Options > Keyboard: "I  Jump to the inspector" (the panel is never titled Inspector on screen); "g then l  Sales", "g then d  Research"
+Sound button: visible "♪ Sound", accessible name "Mute sound"

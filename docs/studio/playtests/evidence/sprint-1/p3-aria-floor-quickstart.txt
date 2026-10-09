@@ -1,0 +1,116 @@
+- link "Skip to the work area":
+  - /url: "#main"
+- banner "Company status":
+  - text: Keystone Manufacturing Thu Jan 1, 1998 7:00 AM · Plant closed Checking $148,964 Net worth $236k City Memphis, TN
+  - group "Clock":
+    - button "Pause" [pressed]
+    - button "Play"
+    - button "Fast"
+    - button "Faster"
+    - button "Run until…"
+    - button "Mute sound": ♪ Sound
+- navigation "Departments":
+  - list:
+    - listitem:
+      - link "Factory floor":
+        - /url: "#floor"
+    - listitem:
+      - link "Catalog":
+        - /url: "#catalog"
+    - listitem:
+      - link "Research":
+        - /url: "#research"
+    - listitem:
+      - link "Staff":
+        - /url: "#staff"
+    - listitem:
+      - link "Hiring":
+        - /url: "#hire"
+    - listitem:
+      - link "In-basket 4":
+        - /url: "#inbox"
+    - listitem:
+      - link "Purchasing":
+        - /url: "#purchasing"
+    - listitem:
+      - link "Sales":
+        - /url: "#sales"
+    - listitem:
+      - link "Bank":
+        - /url: "#bank"
+    - listitem:
+      - link "Reports":
+        - /url: "#reports"
+    - listitem:
+      - link "City map":
+        - /url: "#city"
+    - listitem:
+      - link "Nation":
+        - /url: "#nation"
+    - listitem:
+      - link "Options & help":
+        - /url: "#options"
+- main:
+  - heading "Factory floor" [level=1]
+  - paragraph: 476 Anvil Pkwy. · 30,400 sq ft · storage 0 of 1,000 boxes
+  - toolbar "Floor tools":
+    - button "Select" [pressed]
+    - button "Paint zones"
+    - combobox "Zone to paint":
+      - option "Bare concrete"
+      - option "Storage zone"
+      - option "Safety zone" [selected]
+      - option "Smoking zone"
+      - option "Carpet"
+      - option "Forklift parking"
+    - button "Lay conveyor ($140)"
+    - button "Catalog…"
+    - button "Zoom out": −
+    - text: 2×
+    - button "Zoom in": +
+  - application "Factory floor, 25 squares wide and 19 deep. Select mode."
+  - paragraph: Arrow keys move the cursor one square (Shift moves five). Enter selects or places. R rotates. M moves the selected item. Delete sells it. Escape cancels.
+  - text: "Safety zone Storage (pallets) Blue arrow: machine input Green arrow: output Grey pad: operator's post Orange cross: service hatch Bars above a machine show each input's stock (full means 16 hours or more). The lamp on its front is green when running, red when broken Workers are coloured by department"
+  - complementary "Inspector":
+    - region "Getting started":
+      - heading "Getting started" [level=2]
+      - paragraph: 6 of 8 done
+      - list:
+        - listitem: ✓ Place a production machine (done)
+        - listitem: ✓ Paint a safety zone (or lay a belt) on each machine input (done)
+        - listitem: ✓ Hire a Line Worker (done)
+        - listitem: ✓ Give every machine an operator (done)
+        - listitem: ✓ Order materials (done)
+        - listitem: Start the clock (Play or space bar)
+        - listitem: ✓ Hire an Account Rep and give them a desk (done)
+        - listitem:
+          - text: Make your first sale
+          - button "Go"
+    - heading "Cursor" [level=2]
+    - paragraph: "Column 3, row 3: Empty floor"
+  - heading "Equipment" [level=2]
+  - table "Equipment on the floor":
+    - caption: Equipment on the floor
+    - rowgroup:
+      - row "Item Column, row Status / occupant Value Actions":
+        - columnheader "Item"
+        - columnheader "Column, row"
+        - columnheader "Status / occupant"
+        - columnheader "Value"
+        - columnheader "Actions"
+    - rowgroup:
+      - 'row "Die-casting cell machine #5 5, 5 No operator $84,000 Select"':
+        - 'rowheader "Die-casting cell machine #5"'
+        - cell "5, 5"
+        - cell "No operator"
+        - cell "$84,000"
+        - cell "Select":
+          - button "Select"
+      - 'row "Cubicle #6 13, 5 Jacob Reed $2,900 Select"':
+        - 'rowheader "Cubicle #6"'
+        - cell "13, 5"
+        - cell "Jacob Reed"
+        - cell "$2,900"
+        - cell "Select":
+          - button "Select"
+- text: "Quick start: Keystone Manufacturing in Memphis, TN. Press Play to start the clock."

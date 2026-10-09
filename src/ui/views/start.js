@@ -3,11 +3,11 @@ import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
 import { CITIES, ECONOMY, FAMILIES, ITEM_ID, ITEMS, RECIPES } from '../../gen/data.js';
 import { lineOutlook } from '../../sim/world.js';
-import { jobFor } from '../../core/content.js';
+import { jobFor, aOrAn } from '../../core/content.js';
 import { money, fmtDate } from '../../core/util.js';
 import { listSaves, loadGame, deleteSave, topScores } from '../storage.js';
 import { makeCandidate } from '../../sim/people.js';
-import { ports, inputPorts, ZONE, newFloor } from '../../sim/floor.js';
+import { ports, inputPorts, ZONE, newFloor, objectLabel } from '../../sim/floor.js';
 import { demoScene } from '../topdown.js';
 import { sfx } from '../sound.js';
 
@@ -25,7 +25,7 @@ export function render() {
     h('p', { class: 'kicker' }, 'A 90s-style factory management sim'),
     h('h1', null, 'Overhead'),
     h('div', { class: 'hazard-rule', 'aria-hidden': 'true' }),
-    h('p', null, `Choose one of ${CITIES.length} American cities and lease a plant. Turn resin, steel and copper wire into motors, circuit boards and housings, then into lamps, toasters, tents, toys and fax machines. Hire a crew with real personalities, keep the machines fed, and outsell the firms across town.`),
+    h('p', null, `Choose one of ${CITIES.length} American cities and lease a plant. Turn resin, steel and magnet wire into motors, control boards and housings, then into lamps, toasters, tents, toys and cash registers. Hire a crew with real personalities, keep the machines fed, and outsell the firms across town.`),
     h('p', { class: 'muted' }, 'Every screen works with a keyboard and a screen reader, and the clock only moves when you start it.'),
     h('div', { class: 'row' },
       saves?.auto ? h('button', { class: 'primary', type: 'button', onclick: () => loadSlot('auto') }, `Continue ${saves.auto.company}`) : null,
@@ -70,7 +70,7 @@ function savesCard() {
   const fileIn = h('input', { type: 'file', accept: '.json,application/json', id: 'import-file', onchange: async e => {
     const f = e.target.files[0]; if (!f) return;
     try { const st = JSON.parse(await f.text()); if (!st.setup || !st.bank) throw new Error('not a save'); app.st = G.migrate(st); announce(`Loaded ${st.setup.company}.`); go(st.phase === 'play' ? 'floor' : st.phase); }
-    catch { announce("That file isn't an Overhead save.", 'assertive'); }
+    catch (e) { announce(/newer version/.test(e?.message) ? e.message : "That file isn't an Overhead save.", 'assertive'); }
   } });
   const rows = saves ? Object.values(saves).sort((a, b) => b.savedAt - a.savedAt) : [];
   return h('section', { class: 'card', 'aria-labelledby': 'saves-h' }, h('h2', { id: 'saves-h' }, 'Saved games'),
@@ -87,7 +87,8 @@ function savesCard() {
 async function loadSlot(slot) {
   const st = await loadGame(slot);
   if (!st) { announce('That save could not be read.', 'assertive'); return; }
-  app.st = G.migrate(st); app.speed = 0; announce(`Loaded ${st.setup.company}, ${fmtDate(st.time)}.`);
+  try { app.st = G.migrate(st); } catch (e) { announce(e.message, 'assertive'); return; }
+  app.speed = 0; announce(`Loaded ${st.setup.company}, ${fmtDate(st.time)}.`);
   go(st.phase === 'play' ? 'floor' : st.phase === 'city' ? 'city' : 'nation');
 }
 
@@ -99,7 +100,7 @@ function quickStart() {
   const [, cityId] = options[Math.floor(Math.random() * options.length)];
   G.visitCity(st, cityId);
   const lot = st.city.lots.filter(l => l.firm == null).sort((a, b) => Math.abs(a.sqft - 30000) + a.rentPsf * 20000 - (Math.abs(b.sqft - 30000) + b.rentPsf * 20000))[0];
-  G.rentBuilding(st, lot.id);
+  G.rentBuilding(st, lot.id, { quiet: true }); // Quick start sets the plant up itself, so no "building is bare" memo
   const fallback = RECIPES.find(r => r.out === ITEM_ID[ECONOMY.quickStart.product]);
   const best = RECIPES.filter(r => r.start && r.inputs.every(([i]) => ITEMS[i].tier === 'material')).map(r => [r, lineOutlook(st, r.id) / FAMILIES[r.family].price]).sort((a, b) => b[1] - a[1])[0];
   const pick = best && best[1] > 0 ? best[0] : fallback;
@@ -111,7 +112,7 @@ function quickStart() {
   for (const job of crew) { const c = makeCandidate(st, job.key); const memo = G.memo(st, { from: `${c.first} ${c.last}`, subject: 'Resume', kind: 'resume', data: { cand: c, expires: st.time + 1e7 } }); memo.read = true; G.makeOffer(st, memo.id, c.ask); }
   G.purchaseAll(st);
   st.memos.forEach(x => { if (x.kind === 'resume') x.read = true; });
-  G.memo(st, { from: 'Plant manager', subject: 'Quick start: ready to roll', important: false, body: `A ${FAMILIES[pick.family].name.toLowerCase()} making ${ITEMS[pick.out].name}, the best opening for a first machine in ${st.city.name}, is set up with safety zones, a ${crew[0].title} is on it, an ${crew[1].title} has an office, and the first materials are on order. Press Play (or the space bar) to start the clock. Good next hires: a ${jobFor('finance').title} and a ${jobFor('maintenance').title}. Then add a product line that uses what this machine makes.` });
+  G.memo(st, { from: 'Plant log', subject: 'Quick start: ready to roll', important: false, body: `${objectLabel(st, m)} making ${ITEMS[pick.out].name}, the best opening for a first machine in ${st.city.name}, is set up with safety zones, ${aOrAn(crew[0].title)} is on it, ${aOrAn(crew[1].title)} has an office, and the first materials are on order. Press Play (or the space bar) to start the clock. Good next hires: ${aOrAn(jobFor('finance').title)} and ${aOrAn(jobFor('maintenance').title)}. Then add a second machine that uses what this one makes.` });
   st.flags.pauseRequest = false; G.bus.queue.length = 0;
   app.st = st; app.speed = 0;
   sfx('place'); announce(`Quick start: ${st.setup.company} in ${st.city.name}. Press Play to start the clock.`);

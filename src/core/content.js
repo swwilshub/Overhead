@@ -21,6 +21,15 @@ export const jobFor = role => JOB_LIST.find(j => j.roles.includes(role) && !j.le
 // floor jobs that can run a production machine or work in a cell
 export const RUNS_MACHINES = ['operator', 'foreman', 'researcher'];
 export const canRunMachine = e => RUNS_MACHINES.some(r => hasRole(e, r));
+// "a" or "an" before a job title (or any noun), worked out from how the word starts so no text hard-codes the
+// article: aOrAn('Machine Operator') is "a Machine Operator", aOrAn('engineer', true) is "An engineer". Words that
+// start with a vowel letter but a consonant sound (unit, user, one, Euro) take "a"; a silent h (hour, honest) takes "an".
+export function aOrAn(word, capital = false) {
+  const w = String(word).trim();
+  const an = /^(hour|honest|honou?r|heir)/i.test(w) || (/^[aeiou]/i.test(w) && !/^(u[nr]i|us[eu]|uti|eu|one\b|once\b)/i.test(w));
+  const art = an ? 'an' : 'a';
+  return `${capital ? 'A' + art.slice(1) : art} ${w}`;
+}
 
 export const FIRST_M = 'James John Robert Michael William David Richard Joseph Thomas Charles Christopher Daniel Matthew Anthony Mark Donald Steven Paul Andrew Joshua Kenneth Kevin Brian George Timothy Ronald Edward Jason Jeffrey Ryan Jacob Gary Nicholas Eric Jonathan Stephen Larry Justin Scott Brandon Benjamin Samuel Gregory Alexander Frank Patrick Raymond Jack Dennis Jerry Tyler Aaron Jose Adam Nathan Henry Douglas Zachary Peter Kyle Ethan Walter Noah Jeremy Christian Keith Roger Terry Gerald Harold Sean Austin Carl Arthur Lawrence Dylan Jesse Jordan Bryan Billy Joe Bruce Gabriel Logan Albert Willie Alan Juan Wayne Elijah Randy Roy Vincent Ralph Eugene Russell Bobby Mason Philip Louis Marcus Darnell Hector Luis Omar Rafael Kenji Hiro Ravi Arjun Tomas Andre Malik Desmond Felix Ivan Mateo'.split(' ');
 export const FIRST_F = 'Mary Patricia Jennifer Linda Elizabeth Barbara Susan Jessica Sarah Karen Lisa Nancy Betty Margaret Sandra Ashley Kimberly Emily Donna Michelle Carol Amanda Dorothy Melissa Deborah Stephanie Rebecca Sharon Laura Cynthia Kathleen Amy Angela Shirley Anna Brenda Pamela Emma Nicole Helen Samantha Katherine Christine Debra Rachel Carolyn Janet Catherine Maria Heather Diane Ruth Julie Olivia Joyce Virginia Victoria Kelly Lauren Christina Joan Evelyn Judith Megan Andrea Cheryl Hannah Jacqueline Martha Gloria Teresa Ann Sara Madison Frances Kathryn Janice Jean Abigail Alice Judy Sophia Grace Denise Amber Doris Marilyn Danielle Beverly Isabella Theresa Diana Natalie Brittany Charlotte Marie Kayla Alexis Lori Rosa Yolanda Keisha Mei Priya Aiko Lucia Ingrid Nadia Fatima Elena Monique Tamika Leah Simone'.split(' ');

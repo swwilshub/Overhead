@@ -26,13 +26,13 @@ valuable its goods are.
 | Key | Line | Code | Tier | Inputs | Price | MTBF (h) | Tool head |
 |---|---|---|---|---|---|---|---|
 | `extrusion` | Extrusion line | EX | Mk I | 2 | $68,000 | 420 | roller |
-| `diecast` | Die-casting cell | DC | Mk I | 2 | $84,000 | 360 | ram |
+| `diecast` | Die-casting line | DC | Mk I | 2 | $84,000 | 360 | ram |
 | `winding` | Coil winding line | CW | Mk I | 3 | $76,000 | 400 | winder |
 | `boards` | Board assembly line | BA | Mk I | 4 | $104,000 | 340 | gantry |
-| `machining` | Machine shop | MS | Mk I | 2 | $72,000 | 460 | lathe |
+| `machining` | Machining line | MS | Mk I | 2 | $72,000 | 460 | lathe |
 | `sewing` | Cut-and-sew line | TX | Mk I | 3 | $58,000 | 500 | stitcher |
 | `lighting` | Lighting line | LT | Mk II | 3 | $112,000 | 380 | turret |
-| `furniture` | Furniture shop | FN | Mk II | 3 | $96,000 | 440 | saw |
+| `furniture` | Furniture line | FN | Mk II | 3 | $96,000 | 440 | saw |
 | `appliance` | Small-appliance line | SA | Mk II | 4 | $138,000 | 360 | hoist |
 | `outdoor` | Outdoor gear line | OG | Mk III | 3 | $152,000 | 400 | welder |
 | `toys` | Toy and game line | TG | Mk III | 3 | $168,000 | 380 | mould |
@@ -68,7 +68,7 @@ basic one and one that needs a cell technology. These live in `world.json` under
 | Die-casting | zinc housing, aluminum frame, heat sink, weighted base |
 | Coil winding | fractional motor, power transformer, speaker driver, heating element |
 | Board assembly | control board, power supply board, tuner module, LCD panel, logic board* |
-| Machine shop | turned shaft, gear train, spring set, hinge and slide kit, steel tube frame |
+| Machining | turned shaft, gear train, spring set, hinge and slide kit, steel tube frame |
 | Cut-and-sew | fabric panel, seat cushion, strap and buckle set |
 
 \* needs research.
@@ -127,7 +127,7 @@ The exact recipes are in `world.json`. Rules used when writing them:
 |---|---|---|
 | Conveyor section | $140 | one square of belt |
 | Storage bin | $1,500 | 2 × 2, links storage to a belt line |
-| Pallet jack | $3,900 | operators carry two boxes a trip |
+| Pallet jack | $3,900 | Machine Operators carry two boxes a trip |
 | Forklift | $14,500 | four boxes a trip, parks on forklift squares |
 
 A machine is a **5 × 3** block. Its input squares are on the left side and the front. The output is on the right,
@@ -157,28 +157,33 @@ City size drives wages, rent and how experienced applicants are (`economy.city`)
 
 ## 5. Organisation
 
-There are six departments and 14 roles. The mechanics behind them: a crew runs machines, a supervisor lifts the
-crew, mechanics repair machines, engineers do research, and office staff keep the books, buy materials and sell.
-Office staff need a desk.
+There are six departments and 14 roles. The mechanics behind them: Machine Operators run machines, a Floor
+Supervisor lifts the crew, Plant Mechanics repair machines, Research Engineers do research, and office staff keep the
+books, buy materials and sell. Office staff need a desk.
+
+Names follow one rule: a job title says what the person does, a department has the same name as its screen (Sales,
+Purchasing, Finance), and every line is called "*X* line". A production cell takes its line's process name, so the
+Die-casting line makes a "Die-casting cell". Memos about the plant itself come from "Plant log", not from a job you
+could hire.
 
 | Department | Role | Lead? | Works in | Job |
 |---|---|---|---|---|
-| Front office | Plant Director | yes | office | lifts every office department |
-| Finance | Finance Chief | yes | office | leads the books |
+| Management | Plant Director | yes | office | lifts every office department |
+| Finance | Finance Manager | yes | office | does Finance work and lifts the department |
 | Finance | Bookkeeper | | office | invoices, payments, payroll |
-| Finance | Office Assistant | | office | filing and data entry for Finance |
-| Commercial | Commercial Lead | yes | office | leads sales and promotion |
-| Commercial | Account Rep | | office | wins orders |
-| Commercial | Promotions Specialist | | office | raises product awareness |
-| Supply | Supply Lead | yes | office | leads buying |
-| Supply | Buyer | | office | places material orders |
-| Production | Shift Supervisor | yes | floor | lifts machine output, lowers crew stress |
-| Production | Line Worker | | floor | runs a machine or works in a cell |
+| Finance | Finance Clerk | | office | the same Finance work as a Bookkeeper, for less pay |
+| Sales | Sales Manager | yes | office | does sales work and lifts the department |
+| Sales | Sales Rep | | office | wins orders from stores |
+| Sales | Marketer | | office | runs ads, raises brand awareness |
+| Purchasing | Purchasing Manager | yes | office | does buying and lifts the department |
+| Purchasing | Materials Buyer | | office | reorders materials up to the stock targets |
+| Production | Floor Supervisor | yes | floor | lifts machine output, lowers crew stress, can run a machine |
+| Production | Machine Operator | | floor | runs a machine or works in a cell, and carries its boxes |
 | Engineering | Chief Engineer | yes | office | speeds up all research |
-| Engineering | Development Engineer | | floor | runs research machines and cell technology research |
+| Engineering | Research Engineer | | floor | runs research machines and cell technology research |
 | Engineering | Plant Mechanic | | floor | services and repairs machines |
 
-The pay multiples (of the city average salary) run from 0.6 (Office Assistant) to 2.3 (Plant Director).
+The pay multiples (of the city average salary) run from 0.6 (Finance Clerk) to 2.3 (Plant Director).
 
 ### Traits
 

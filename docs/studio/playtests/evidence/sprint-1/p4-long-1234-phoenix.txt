@@ -1,0 +1,31 @@
+Feb 1, 1998 NW    $252,846 cash   $147,240 sales   $47,526 exp  $131,470 made   33965 staff 3 mach 1 eff 0.75
+Mar 1, 1998 NW    $307,337 cash    $78,764 sales  $117,378 exp  $185,815 made   32801 staff 6 mach 2 eff 0.01
+Apr 1, 1998 NW    $372,096 cash   $151,427 sales  $179,699 exp  $112,238 made   33296 staff 6 mach 2 eff 0.73
+May 1, 1998 NW    $433,999 cash   $219,029 sales  $175,739 exp  $104,749 made   37720 staff 6 mach 2 eff 0.40
+    Move to 894 Pier Blvd. under way: about 4 days.
+Jun 1, 1998 NW    $427,611 cash   $191,014 sales  $160,878 exp  $163,940 made   31768 staff 6 mach 2 eff 0.12
+Jul 1, 1998 NW    $472,708 cash   $119,729 sales  $184,898 exp  $265,421 made   32283 staff 9 mach 3 eff 0.03
+Aug 1, 1998 NW    $521,841 cash   $235,685 sales  $278,012 exp  $159,806 made   37213 staff 9 mach 3 eff 0.28
+Sep 1, 1998 NW    $622,180 cash   $133,940 sales  $201,916 exp  $309,768 made   35504 staff 11 mach 4 eff 0.02
+Oct 1, 1998 NW    $713,351 cash   $232,144 sales  $325,784 exp  $221,432 made   34125 staff 11 mach 4 eff 0.00
+Nov 1, 1998 NW    $871,657 cash   $265,946 sales  $418,504 exp  $384,662 made   51942 staff 13 mach 5 eff 0.31
+Dec 1, 1998 NW  $1,050,966 cash   $326,291 sales  $454,536 exp  $404,496 made   57349 staff 14 mach 6 eff 0.11
+Jan 1, 1999 NW  $1,247,112 cash   $600,965 sales  $584,853 exp  $328,169 made   67696 staff 14 mach 6 eff 0.50
+Feb 1, 1999 NW  $1,429,769 cash   $728,239 sales  $505,110 exp  $312,656 made   62498 staff 14 mach 6 eff 0.37
+Mar 1, 1999 NW  $1,608,023 cash   $908,674 sales  $514,619 exp  $330,690 made   58793 staff 14 mach 6 eff 0.38
+Apr 1, 1999 NW  $1,772,338 cash $1,141,464 sales  $536,908 exp  $380,777 made   63555 staff 14 mach 6 eff 0.50
+May 1, 1999 NW  $1,955,026 cash $1,314,813 sales  $543,122 exp  $333,493 made   64908 staff 14 mach 6 eff 0.37
+Jun 1, 1999 NW  $2,127,032 cash $1,457,155 sales  $516,358 exp  $389,521 made   59700 staff 14 mach 6 eff 0.11
+Jul 1, 1999 NW  $2,299,864 cash $1,683,226 sales  $541,119 exp  $333,119 made   64878 staff 14 mach 6 eff 0.50
+Aug 1, 1999 NW  $2,479,039 cash $1,870,890 sales  $534,847 exp  $313,606 made   64288 staff 14 mach 6 eff 0.37
+Sep 1, 1999 NW  $2,644,597 cash $2,029,446 sales  $529,815 exp  $392,550 made   62412 staff 14 mach 6 eff 0.45
+Oct 1, 1999 NW  $2,831,471 cash $2,250,319 sales  $525,436 exp  $315,520 made   66712 staff 14 mach 6 eff 0.51
+Nov 1, 1999 NW  $3,004,280 cash $2,359,154 sales  $531,020 exp  $353,430 made   59793 staff 14 mach 6 eff 0.37
+Dec 1, 1999 NW  $3,168,241 cash $2,564,831 sales  $539,172 exp  $393,113 made   62192 staff 14 mach 6 eff 0.47
+Jan 1, 2000 NW  $3,363,582 cash $2,786,877 sales  $563,019 exp  $317,861 made   67944 staff 14 mach 6 eff 0.37
+over null score $3,363,582 lines Rubber gasket set, Computer desk, Bookcase, Power supply board, Desk lamp, Fabric panel
+save bytes 234673 firms alive 102 / 113
+
+real	0m3.541s
+user	0m4.434s
+sys	0m0.149s

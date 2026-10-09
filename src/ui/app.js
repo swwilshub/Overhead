@@ -1,10 +1,11 @@
 // App shell: status bar, navigation, the run loop, refresh with focus preservation.
-import { h, announce, prefs, dialog, confirmBox } from './dom.js';
+import { h, frag, announce, prefs, dialog, confirmBox, captureFocus, restoreFocus } from './dom.js';
 import * as G from '../sim/game.js';
 import { fmtDate, fmtTime, money, moneyShort, minuteOfDay, isWorkday, MIN_PER_DAY, monthKey, weekday } from '../core/util.js';
 import { WORK_START, WORK_END, isWhite } from '../sim/people.js';
 import { hasRole } from '../core/content.js';
-import { ports, links, ZONE } from '../sim/floor.js';
+import { ports, links, ZONE, objectLabel } from '../sim/floor.js';
+import { stalledMachines } from '../sim/stalls.js';
 import { saveGame, localPrefsGet, localPrefsSet, submitScore } from './storage.js';
 import { sfx, sfxBatch, ambience } from './sound.js';
 
@@ -52,20 +53,15 @@ function inGame() { return app.st && app.st.phase === 'play'; }
 
 export function render(opts = {}) {
   const root = document.getElementById('app');
-  const prevFocus = document.activeElement?.dataset?.key || (document.activeElement?.id ? '#' + document.activeElement.id : null);
+  const prevFocus = captureFocus(root);
   const main = document.getElementById('main');
   const scroll = main ? main.scrollTop : 0;
   root.replaceChildren(statusBar(), h('div', { class: 'body' }, navRail(), h('main', { id: 'main', tabindex: -1 }, viewContent())));
   const nm = document.getElementById('main');
   if (opts.focusMain) { nm.scrollTop = 0; const hd = nm.querySelector('h1'); (hd || nm).setAttribute('tabindex', '-1'); (hd || nm).focus({ preventScroll: true }); }
-  else { nm.scrollTop = scroll; restoreFocus(prevFocus); }
+  else { nm.scrollTop = scroll; restoreFocus(prevFocus, root); }
   app.dirty = false; app.lastRefresh = performance.now();
   app.views[app.view]?.mounted?.(app);
-}
-function restoreFocus(key) {
-  if (!key) return;
-  const el = key.startsWith('#') ? document.getElementById(key.slice(1)) : document.querySelector(`[data-key="${CSS.escape(key)}"]`);
-  if (el) el.focus({ preventScroll: true });
 }
 function viewContent() {
   const v = app.views[app.view];
@@ -93,16 +89,24 @@ function statusBar() {
   const bar = h('header', { class: 'status', 'aria-label': 'Company status' },
     h('div', { class: 'brand' }, h('span', { class: 'stripe', 'aria-hidden': 'true' }), st ? st.setup.company : 'Overhead'));
   if (!st) return bar;
-  bar.append(
+  bar.append(frag(
     h('div', { class: 'clock', id: 'st-clock', 'aria-label': 'Game date and time' }, clockText()),
     h('div', { class: 'figs' },
       h('div', { class: 'fig' }, h('span', null, 'Checking'), h('span', { id: 'st-cash' }, money(st.bank.checking))),
       h('div', { class: 'fig' }, h('span', null, 'Net worth'), h('span', { id: 'st-nw' }, moneyShort(G.netWorth(st)))),
       st.city ? h('div', { class: 'fig' }, h('span', null, 'City'), h('span', null, st.city.name)) : null),
     inGame() ? runControls() : null,
-    h('span', { id: 'st-alert' }));
+    alertSlot()));
   return bar;
 }
+// The "N setup issues" button lives in the status bar, which render() rebuilds. It is built there (not added later by
+// updateStatus) and has a data-key, so focus on it survives a full render; updateStatus patches its text in place.
+const issueText = n => `${n} issue${n > 1 ? 's' : ''}`;
+function alertSlot() {
+  const n = setupProblems(app.st).length;
+  return h('span', { id: 'st-alert', 'data-v': n ? issueText(n) : '' }, n ? alertButton(issueText(n)) : null);
+}
+const alertButton = text => h('button', { class: 'alert', type: 'button', 'data-key': 'st-alert', onclick: () => go('floor') }, text);
 function clockText() {
   const st = app.st; const m = minuteOfDay(st.time);
   const shift = isWorkday(st.time) && m >= WORK_START && m < WORK_END ? 'Shift running' : 'Plant closed';
@@ -140,8 +144,19 @@ function updateStatus() {
   const al = document.getElementById('st-alert');
   if (al) {
     const n = setupProblems(st).length;
-    const want = n ? `${n} setup issue${n > 1 ? 's' : ''}` : '';
-    if (al.dataset.v !== want) { al.dataset.v = want; al.replaceChildren(n ? h('button', { class: 'alert', type: 'button', onclick: () => go('floor') }, want) : ''); }
+    const want = n ? issueText(n) : '';
+    if (al.dataset.v !== want) {
+      al.dataset.v = want;
+      const btn = al.querySelector('button');
+      if (btn && n) btn.textContent = want; // same element, so focus stays on it
+      else if (n) al.replaceChildren(alertButton(want));
+      else {
+        // the last issue is fixed: if the button has focus, hand it to its neighbour in the bar instead of the page body
+        const had = btn && document.activeElement === btn;
+        al.replaceChildren();
+        if (had) document.querySelector('.status [data-key="mute"], .status [data-key="runto"]')?.focus({ preventScroll: true });
+      }
+    }
   }
   updateNavBadges();
 }
@@ -160,8 +175,10 @@ export function setupProblems(st) {
   for (const o of machines) {
     if (o.mode !== 'produce') continue;
     const un = G.unsafeInputs(fl, o);
-    if (un.length) { out.push({ text: `Machine #${o.id} needs a safety zone (or a belt) at input ${un.map(u => u.k + 1).join(' and ')}.`, view: 'floor', obj: o.id }); }
+    if (un.length) { out.push({ text: `${objectLabel(st, o)} needs a safety zone (or a belt) at input ${un.map(u => u.k + 1).join(' and ')}.`, view: 'floor', obj: o.id }); }
   }
+  // machines that are starved or blocked right now, each with its reason (a delivery on its way is not a problem)
+  for (const s of stalledMachines(st)) out.push({ text: `${objectLabel(st, s.obj)}: ${s.short}.`, view: 'floor', obj: s.obj.id, stall: s.kind });
   if (links(fl).dangling) out.push({ text: 'Some conveyor belts do not connect to anything.', view: 'floor' });
   if (st.employees.some(e => isWhite(e) && !fl.objects.some(o => (o.kind === 'office' || o.kind === 'suite') && o.id === e.assign))) out.push({ text: 'An office worker has no office.', view: 'catalog' });
   return out;
@@ -241,19 +258,29 @@ async function gameOver() {
 }
 
 // ---- keyboard shortcuts (single keys can be switched off in Options)
+// They work everywhere outside text fields and dialogs, the floor grid included. After g, the next key within 1.5 s
+// is for navigation only: the floor grid leaves it alone (navPending), so g m opens the City map and doesn't start a move.
 let gPending = 0;
+const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'AltGraph']);
+export const shortcutsOn = () => !!(prefs.shortcuts && app.st && app.st.phase === 'play');
+export const navPending = e => shortcutsOn() && !!gPending && Date.now() - gPending < 1500 && !MODIFIERS.has(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey;
 export function installKeys() {
   document.addEventListener('keydown', e => {
     if (!prefs.shortcuts || e.ctrlKey || e.metaKey || e.altKey) return;
     const t = e.target;
-    if (t.closest('input,select,textarea,[role="application"],dialog')) return;
+    if (t.closest('input,select,textarea,dialog')) return;
     if (!app.st || app.st.phase !== 'play') return;
+    if (MODIFIERS.has(e.key)) return;
+    if (gPending) {
+      const fresh = Date.now() - gPending < 1500; gPending = 0;
+      if (fresh && NAV_KEYS[e.key]) { e.preventDefault(); go(NAV_KEYS[e.key]); return; }
+      if (fresh && e.key !== 'g' && t.closest('[role="application"]')) return;
+    }
     if (e.key === ' ' && !t.closest('button,a,[role="button"]')) { e.preventDefault(); setSpeed(app.speed ? 0 : 1); updatePressed(); return; }
     if (e.key === '[') { setSpeed(Math.max(0, app.speed - 1)); updatePressed(); return; }
     if (e.key === ']') { setSpeed(Math.min(3, app.speed + 1)); updatePressed(); return; }
     if (e.key === '?') { go('options'); return; }
     if (e.key === 'g') { gPending = Date.now(); return; }
-    if (gPending && Date.now() - gPending < 1500 && NAV_KEYS[e.key]) { gPending = 0; go(NAV_KEYS[e.key]); }
   });
 }
 function updatePressed() { document.querySelectorAll('.status .run button[data-key^="speed-"]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.key.slice(6) === app.speed))); }

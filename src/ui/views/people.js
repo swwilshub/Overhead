@@ -40,8 +40,8 @@ export const staff = {
 function deptSummary(st) {
   const d = st.dept, delay = G.accountingDelay(st);
   const items = [
-    ['Finance', st.employees.some(e => hasRole(e, 'finance')) ? (delay > 2 ? pill(`${delay} days behind`, 'warn') : pill('Up to date', 'ok')) : pill('No staff: bills paid late', 'bad')],
-    ['Supply', st.employees.some(e => hasRole(e, 'purchasing')) ? pill(`Can place about ${Math.max(1, Math.round(d.purchCap))} orders a day`, 'ok') : pill('No staff: you place every order', 'warn')],
+    [deptName('finance'), st.employees.some(e => hasRole(e, 'finance')) ? (delay > 2 ? pill(`${delay} days behind`, 'warn') : pill('Up to date', 'ok')) : pill('No staff: bills paid late', 'bad')],
+    [deptName('supply'), st.employees.some(e => hasRole(e, 'purchasing')) ? pill(`Can place about ${Math.max(1, Math.round(d.purchCap))} orders a day`, 'ok') : pill('No staff: you place every order', 'warn')],
     ['Sales effort', h('span', null, meter(d.salesEff / 3, 'Sales effort'), ' ', d.salesEff < 0.5 ? 'Walk-in customers only' : d.salesEff < 1.2 ? 'Modest' : 'Strong')],
     ['Brand awareness', h('span', null, meter(d.awareness, 'Brand awareness'), ' ', pct(d.awareness))],
   ];
@@ -91,7 +91,7 @@ function resumeTable(st, resumes) {
     { key: 'ask', label: 'Asking', num: true, render: m => money(m.data.cand.ask), sort: m => m.data.cand.ask },
     { key: 'yrs', label: 'Experience', num: true, render: m => `${m.data.cand.years} yr`, sort: m => m.data.cand.years },
     { key: 'exp', label: 'Expires', render: m => fmtShortDate(m.data.expires), sortable: false },
-    { key: 'go', label: '', sortable: false, render: m => h('button', { type: 'button', onclick: () => openResume(m.id) }, 'Review and offer') }],
+    { key: 'go', label: '', sortable: false, render: m => h('button', { type: 'button', 'data-key': 'offer-' + m.id, onclick: () => openResume(m.id) }, 'Review and offer') }],
     resumes, { hideCaption: true, empty: 'No resumes waiting. Place an ad below.', defaultSort: 'fit', defaultDir: -1 });
 }
 
@@ -124,7 +124,7 @@ export const inbox = {
     const filt = h('div', { class: 'row', role: 'group', 'aria-label': 'Show' }, [['all', 'All'], ['unread', 'Unread'], ['important', 'Urgent'], ['resumes', 'Resumes']].map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(v.filter === k), 'data-key': 'if-' + k, onclick: () => { v.filter = k; rerender({}); } }, l)));
     return h('div', { class: 'stack' },
       h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'In-basket'), h('p', null, `${num(st.memos.filter(m => !m.read).length)} unread of ${num(st.memos.length)} memos.`)),
-        h('div', { class: 'row' }, h('button', { type: 'button', onclick: () => { st.memos.forEach(m => { m.read = true; }); act({ ok: true, msg: 'All memos marked read.' }); } }, 'Mark all read'), h('button', { type: 'button', onclick: () => { const n = st.memos.length; st.memos = st.memos.filter(m => !m.read || (m.kind === 'resume' && !m.data.hired && !m.data.gone)); act({ ok: true, msg: `Cleared ${n - st.memos.length} read memos.` }); } }, 'Clear read memos'))),
+        h('div', { class: 'row' }, h('button', { type: 'button', 'data-key': 'memo-readall', onclick: () => { st.memos.forEach(m => { m.read = true; }); act({ ok: true, msg: 'All memos marked read.' }); } }, 'Mark all read'), h('button', { type: 'button', 'data-key': 'memo-clear', onclick: () => { const n = st.memos.length; st.memos = st.memos.filter(m => !m.read || (m.kind === 'resume' && !m.data.hired && !m.data.gone)); act({ ok: true, msg: `Cleared ${n - st.memos.length} read memos.` }); } }, 'Clear read memos'))),
       filt,
       h('div', { class: 'grid2', style: { gridTemplateColumns: 'minmax(min(100%, 320px), 1fr) minmax(min(100%, 320px), 1.3fr)', alignItems: 'start' } },
         h('section', { class: 'card', 'aria-labelledby': 'mlist' }, h('h2', { id: 'mlist', class: 'sr-only' }, 'Memos'),

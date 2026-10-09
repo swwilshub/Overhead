@@ -1,6 +1,7 @@
 // Factory floor: tiles, zones, equipment footprints, access rules, conveyor networks.
 import { FAMILIES, RECIPES, ITEMS, OFFICES as OFFICES_DATA, EQUIPMENT } from '../gen/data.js';
 import { itemDef, itemTiles } from './cells.js';
+import { statusPhrase } from './stalls.js';
 
 export const TILE_SQFT = 64;
 export const ZONE = { NONE: 0, STORAGE: 1, SAFETY: 2, SMOKING: 3, CARPET: 4, FORKLIFT: 5 };
@@ -45,6 +46,9 @@ export const isInputPort = p => /^in\d$/.test(p);
 export const isProducer = o => o.kind === 'machine' || o.kind === 'cell';
 // rooms the player designs: production cells and office suites
 export const isRoom = o => o.kind === 'cell' || o.kind === 'suite';
+// The marker drawn over a stopped machine on the floor: "!" when it has run out of materials or room, "?" when
+// nobody is there to run it. Broken machines get their own red "x".
+export const statusMark = s => /Out of materials|full/i.test(s || '') ? '!' : /No operator|no engineer/.test(s || '') ? '?' : null;
 export const inputCount = o => isProducer(o) ? FAMILIES[o.family].inputs : 0;
 export const PORT_LABEL = { in0: 'input square', in1: 'input square', in2: 'input square', in3: 'input square', output: 'output square', control: "operator's post", maint: 'service hatch', door: 'doorway' };
 
@@ -141,7 +145,7 @@ export function placementProblem(fl, obj, ignoreId = null) {
     const z = fl.zones[i];
     const a = access.get(i);
     const beltOnPort = obj.kind === 'conveyor' && a && isProducer(a.obj) && (isInputPort(a.port) || a.port === 'output');
-    if (z === ZONE.STORAGE) return 'Pallets are stored there. Repaint the floor first.';
+    if (z === ZONE.STORAGE) return 'That is a storage zone. Repaint the floor first.';
     // a belt may sit on a machine's input or output square even if it is painted as a safety zone (the belt replaces it)
     if (z === ZONE.SAFETY && !beltOnPort) return 'Nothing may stand on a safety zone.';
     if (obj.kind === 'forklift' && z !== ZONE.FORKLIFT) return 'Park forklifts on forklift parking only.';
@@ -157,7 +161,7 @@ export function placementProblem(fl, obj, ignoreId = null) {
       const ok = other && other.kind === 'conveyor' && isProducer(obj) && (isInputPort(p) || p === 'output');
       if (!ok) return `Its ${PORT_LABEL[p]} would be blocked. Leave that square free.`;
     }
-    if (fl.zones[i] === ZONE.STORAGE) return `Its ${PORT_LABEL[p]} would land on stored pallets. Repaint that square first.`;
+    if (fl.zones[i] === ZONE.STORAGE) return `Its ${PORT_LABEL[p]} would land on a storage zone. Repaint that square first.`;
   }
   if (obj.kind === 'bin') {
     const adj = conveyorTilesAround(fl, tiles);
@@ -187,7 +191,7 @@ export function zoneProblem(fl, x, y, zone) {
     if (zone === ZONE.FORKLIFT && o && o.kind === 'forklift') return null;
     return 'Something is standing there.';
   }
-  if (zone === ZONE.STORAGE && access.has(i)) return 'Pallets there would block a machine or door square.';
+  if (zone === ZONE.STORAGE && access.has(i)) return 'A storage zone there would block a machine or door square.';
   return null;
 }
 
@@ -240,7 +244,7 @@ export function links(fl) {
   // per input square: which machine outputs and bins reach it
   const portFeed = {};
   for (const [id, arr] of Object.entries(portNet)) portFeed[id] = arr.map(nIdx => nIdx < 0 ? null : { sources: nets[nIdx].sources.filter(s => s !== +id), bin: nets[nIdx].bins.length > 0, net: nIdx });
-  // bins on an input line feed that input from the warehouse; bins on an output line take goods to storage
+  // bins on an input line feed that input from storage; bins on an output line take goods to storage
   const inBin = {}, outBin = {};
   for (const [id, arr] of Object.entries(portFeed)) arr.forEach((f, k) => { if (f?.bin) (inBin[id] = inBin[id] || {})[k] = true; });
   for (const nt of nets) if (nt.bins.length) for (const sId of nt.sources) outBin[sId] = true;
@@ -306,6 +310,7 @@ export function describeTile(st, x, y) {
   const { access } = occupancy(fl); const a = access.get(y * fl.w + x);
   const parts = [];
   if (o) parts.push(objectLabel(st, o));
+  if (o && isProducer(o)) parts.push(statusPhrase(st, o)); // its state, so the cursor says "broken" or "out of materials"
   if (o && isRoom(o)) { const it = (o.items || []).find(i => itemTiles(i).some(([ix, iy]) => o.x + ix === x && o.y + iy === y)); parts.push(it ? itemDef(it.t).name.toLowerCase() : 'cell floor'); }
   if (z) parts.push(ZONE_INFO[z].name);
   if (a && (!o || o.kind === 'conveyor')) parts.push(`${o ? 'on the ' : ''}${a.port === 'door' ? 'doorway of ' : isInputPort(a.port) ? portName(a.obj, +a.port[2]) + ' of ' : PORT_LABEL[a.port] + ' of '}${objectLabel(st, a.obj)}`);
@@ -317,21 +322,24 @@ export function describeTile(st, x, y) {
 export function beltSummary(st, o) {
   const fl = st.floor, L = links(fl), n = L.netOf.get(o.y * fl.w + o.x);
   const rs = L.routes.filter(r => r.net === n);
-  const tag = id => { const q = fl.objects.find(x => x.id === id); return q.kind === 'bin' ? `bin #${id}` : `#${id}`; };
+  const tag = id => { const q = fl.objects.find(x => x.id === id); return q.kind === 'bin' ? `storage bin #${id}` : objectLabel(st, q); };
   if (!rs.length) {
     const nt = L.nets[n];
-    if (nt && nt.sources.length && !nt.sinks.length && !nt.bins.length) return `belt from machine ${nt.sources.map(i => '#' + i).join(', ')} that doesn't reach an input or bin yet`;
-    if (nt && nt.sinks.length && !nt.sources.length && !nt.bins.length) return `belt to machine ${nt.sinks.map(i => '#' + i).join(', ')} input with nothing feeding it yet`;
+    if (nt && nt.sources.length && !nt.sinks.length && !nt.bins.length) return `belt from ${nt.sources.map(tag).join(', ')} that doesn't reach an input or bin yet`;
+    if (nt && nt.sinks.length && !nt.sources.length && !nt.bins.length) return `belt to an input of ${nt.sinks.map(tag).join(', ')} with nothing feeding it yet`;
     return 'belt not connected to any machine';
   }
-  const into = r => r.k != null ? ` ${portName(fl.objects.find(x => x.id === r.to), r.k)}` : '';
-  return 'belt line ' + rs.map(r => `${tag(r.from)} to ${tag(r.to)}${into(r)}`).join(', ');
+  const into = r => r.k != null ? `${portName(fl.objects.find(x => x.id === r.to), r.k)} of ` : '';
+  return 'belt line ' + rs.map(r => `${tag(r.from)} to ${into(r)}${tag(r.to)}`).join(', ');
 }
 
+// A production cell of a line is named after the line's process: "Die-casting line" gives "Die-casting cell".
+export const cellName = fam => `${FAMILIES[fam].name.replace(/ line$/, '')} cell`;
+// The one name for a piece of equipment, used everywhere text names it: cursor, inspector, tables, memos, belt text.
 export function objectLabel(st, o) {
   switch (o.kind) {
     case 'machine': return `${FAMILIES[o.family].name} machine #${o.id}`;
-    case 'cell': return `${FAMILIES[o.family].name} cell #${o.id}`;
+    case 'cell': return `${cellName(o.family)} #${o.id}`;
     case 'suite': return `Office suite #${o.id}`;
     case 'office': return `${OFFICES[o.officeType].name} #${o.id}`;
     case 'conveyor': return 'Conveyor belt';

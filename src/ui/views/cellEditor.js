@@ -3,16 +3,18 @@
 //   2. Hatches: move the door, the input hatches (one per material) and the output hatch around the outside of the wall.
 //   3. Furnish: place the required items (included in the price), then duplicates and extras, and confirm.
 // Keyboard and mouse do the same things; every step is announced.
-import { h, announce, describe, confirmBox, pill } from '../dom.js';
+import { h, frag, announce, describe, confirmBox, pill, captureFocus, restoreFocus } from '../dom.js';
 import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
-import { inBounds, objectAt, placementProblem } from '../../sim/floor.js';
+import { inBounds, objectAt, placementProblem, objectLabel, cellName } from '../../sim/floor.js';
+import { aOrAn } from '../../core/content.js';
 import { money, num } from '../../core/util.js';
 import { unitsPerHour } from '../../sim/world.js';
 import { sfx } from '../sound.js';
 import { CELL_ITEMS, itemDef, itemTiles, itemSize, isStation, workSquare, itemProblem, analyse, standardLayout, defaultHatches, hatchSpotOk, HATCH_ROLES, REQUIRED, EXTRAS, MIN_SIZE, MAX_SIZE, METRICS, TECHS, cellPrice, techDone } from '../../sim/cells.js';
 import { itemColor } from '../topdown.js';
+import { confirmCredit } from '../credit.js';
 import { analyseSuite, standardSuite, suitePrice, defaultSuiteHatches, SUITE_REQUIRED, SUITE_EXTRAS, SUITE_MIN, SUITE_MAX } from '../../sim/suites.js';
 
 // what differs between a production cell and an office suite
@@ -23,7 +25,7 @@ function K(d) {
     stepNames: ['Size', 'Door', 'Furnish'], perSquare: 90,
   };
   return {
-    suite: false, title: `${FAMILIES[d.family].name} cell`, noun: 'cell', min: MIN_SIZE, max: MAX_SIZE, roles: HATCH_ROLES(d.family),
+    suite: false, title: cellName(d.family), noun: 'cell', min: MIN_SIZE, max: MAX_SIZE, roles: HATCH_ROLES(d.family),
     required: REQUIRED(d.family), extras: EXTRAS(d.family), analyse: (x, o) => analyse(x, o), standard: x => standardLayout(x), price: (w, hh) => cellPrice(d.family, w, hh), hatches: x => defaultHatches(x),
     stepNames: ['Size', 'Hatches', 'Furnish'], perSquare: 120,
   };
@@ -46,13 +48,13 @@ export function startCell(family, recipe = null) {
   v.cell = { stage: 'size', corner: null, draft: { kind: 'cell', family, recipe, x: 0, y: 0, cw: 0, ch: 0, hatches: [], items: [] }, editingId: null, role: 0, tool: null };
   go('floor');
   setTimeout(() => document.getElementById('floor-app')?.focus(), 50);
-  announce(`Building a ${FAMILIES[family].name} cell. Step 1 of 3: move to one corner of the room and press Enter, then to the opposite corner and press Enter. At least ${MIN_SIZE[0]} by ${MIN_SIZE[1]} squares.`, 'polite', false);
+  announce(`Building a new ${cellName(family)}. Step 1 of 3: move to one corner of the room and press Enter, then to the opposite corner and press Enter. At least ${MIN_SIZE[0]} by ${MIN_SIZE[1]} squares.`, 'polite', false);
 }
 export function startEditCell(o) {
   const v = fv(); v.mode = 'cell'; v.sel = null;
   v.cell = { stage: 'furnish', draft: { kind: o.kind, family: o.family, recipe: o.recipe, x: o.x, y: o.y, cw: o.cw, ch: o.ch, hatches: o.hatches.map(x => ({ ...x })), items: o.items.map(x => ({ ...x })) }, editingId: o.id, role: 0, tool: null };
   rerender({}); setTimeout(() => document.getElementById('floor-app')?.focus(), 30);
-  announce(`Editing ${o.kind === 'suite' ? 'office suite' : 'cell'} #${o.id}. Pick an item from the panel to add it, or move to an item and press Enter to pick it up. Delete removes it.`, 'polite', false);
+  announce(`Editing ${objectLabel(app.st, o)}. Pick an item from the panel to add it, or move to an item and press Enter to pick it up. Delete removes it.`, 'polite', false);
 }
 function stop(msg) { const v = fv(); v.mode = 'select'; const id = v.cell?.editingId; v.cell = null; if (id) v.sel = id; if (msg) announce(msg, 'polite', false); rerender({}); document.getElementById('floor-app')?.focus(); }
 
@@ -167,7 +169,7 @@ export function editorDraw(st) {
 }
 
 // ---------- side panel
-function refreshPanel() { const el = document.getElementById('inspector'); if (el) el.replaceChildren(editorPanel(app.st)); app.dirty = true; }
+function refreshPanel() { const el = document.getElementById('inspector'); if (el) { const f = captureFocus(el); el.replaceChildren(editorPanel(app.st)); restoreFocus(f, el); } app.dirty = true; }
 export function editorPanel(st) {
   const v = fv(), E = v.cell, d = E.draft, fam = d.family;
   const k = K(d), steps = k.stepNames, cur = { size: 0, hatch: 1, furnish: 2 }[E.stage];
@@ -197,7 +199,7 @@ export function editorPanel(st) {
   const a = k.analyse(d, { operators: 1 });
   const counts = {}; for (const it of d.items) counts[it.t] = (counts[it.t] || 0) + 1;
   const req = k.required;
-  const pickTool = (t, repeat = false) => { E.tool = { t, repeat }; E.picked = null; v.rot = 0; refreshPanel(); document.getElementById('floor-app')?.focus(); announce(`Placing a ${itemDef(t).name.toLowerCase()}. ${itemDef(t).desc} Move into the room, R rotates, Enter places, Escape stops.`, 'polite', false); };
+  const pickTool = (t, repeat = false) => { E.tool = { t, repeat }; E.picked = null; v.rot = 0; refreshPanel(); document.getElementById('floor-app')?.focus(); announce(`Placing ${aOrAn(itemDef(t).name.toLowerCase())}. ${itemDef(t).desc} Move into the room, R rotates, Enter places, Escape stops.`, 'polite', false); };
   const itemRow = (t, kind) => {
     const def = itemDef(t), have = counts[t] || 0, need = req.find(r => r.t === t)?.n || 0, locked = def.tech && !techDone(st, def.tech);
     const price = kind === 'req' && have < need ? 'Included' : money(def.price);
@@ -228,10 +230,15 @@ export function editorPanel(st) {
 async function confirmCell(st) {
   const E = fv().cell, d = E.draft; const a = K(d).analyse(d);
   if (!a.ok) { sfx('error'); announce(a.problems[0], 'assertive'); return; }
+  // ask before borrowing for a build, or for an edit that costs more; Cancel leaves the editor as it was
+  const old = E.editingId ? st.floor.objects.find(o => o.id === E.editingId) : null;
+  const cost = old ? G.cellExtrasCost(old.family, d.items, old.kind) - G.cellExtrasCost(old.family, old.items, old.kind) : G.roomPrice(d) + G.cellExtrasCost(d.family, d.items, d.kind);
+  if (cost > 0 && !G.cellProblem(st, d, E.editingId) && !(await confirmCredit(st, cost))) return;
+  if (fv().cell !== E) return;
   if (E.editingId) { const r = G.editCell(st, E.editingId, d.items, d.hatches); act(r, false, 'place'); if (r.ok) stop(); return; }
   const r = G.buildCell(st, d);
   if (!r.ok) { act(r); return; }
-  sfx('fanfare'); const id = r.obj.id; stop(K(d).suite ? `Office suite #${id} built for ${money(r.price)}. Give each desk an office worker in the panel.` : `${FAMILIES[d.family].name} cell #${id} built for ${money(r.price)}. Assign operators to it in the panel.`); fv().sel = id; rerender({});
+  sfx('fanfare'); const id = r.obj.id; stop(K(d).suite ? `${objectLabel(st, r.obj)} built for ${money(r.price)}. Give each desk an office worker in the panel.` : `${objectLabel(st, r.obj)} built for ${money(r.price)}. Assign operators to it in the panel.`); fv().sel = id; rerender({});
 }
 
 // metrics block, shared with the inspector of a built cell
@@ -251,7 +258,7 @@ export function cellMetrics(a, d, operators, crewText = null) {
   const wrap = h('div', { class: 'stack cell-metrics', role: 'group', 'aria-label': 'Cell performance' }, h('h3', null, 'Performance'));
   if (!a.ok) { wrap.append(h('ul', { class: 'cell-problems' }, a.problems.slice(0, 5).map(p => h('li', null, p)))); return wrap; }
   const rate = d.recipe != null ? unitsPerHour(d.recipe) : null;
-  wrap.append(
+  wrap.append(frag(
     h('p', null, h('strong', null, `Speed ${(a.speedMult * 100).toFixed(0)}%`), ` of a standard ${FAMILIES[d.family].name.toLowerCase()} machine${crewText ? ` with ${crewText}` : ` with ${operators} operator${operators > 1 ? 's' : ''}`}.`, rate ? ` About ${(rate * a.speedMult).toFixed(1)} units an hour at full speed.` : ''),
     h('p', { class: 'muted' }, `Held back by ${LIMIT[a.limit]}. Walk per part: ${a.D.toFixed(0)} squares. ${a.opsUseful > operators ? `Up to ${a.opsUseful} operators can help in this layout.` : 'More operators would not help this layout.'}`),
     h('dl', { class: 'metric-rows' }, METRICS.map(m => {
@@ -259,6 +266,6 @@ export function cellMetrics(a, d, operators, crewText = null) {
       return [h('dt', null, m.name), h('dd', null, h('span', { class: 'num' }, txt), h('span', { class: 'mbar', role: 'meter', 'aria-label': m.name, 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': Math.round(Math.max(0, Math.min(1, frac)) * 100), 'aria-valuetext': `${txt}. ${m.desc}` }, h('i', { style: { width: Math.max(0, Math.min(1, frac)) * 100 + '%' } })))];
     })),
     a.half.length ? h('p', { class: 'muted' }, `Only working at half strength (not next to what they serve): ${[...new Set(a.half.map(it => itemDef(it.t).name))].join(', ')}.`) : null,
-    a.crowd > 0 ? h('p', { class: 'muted' }, 'The cell is crowded, which lowers Safety and slows people down.') : null);
+    a.crowd > 0 ? h('p', { class: 'muted' }, 'The cell is crowded, which lowers Safety and slows people down.') : null));
   return wrap;
 }

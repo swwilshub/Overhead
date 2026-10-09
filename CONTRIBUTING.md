@@ -24,7 +24,7 @@ Run these before you open a pull request. CI runs the same ones.
 |---|---|
 | `npm run scan` | The content scan (see below). Must pass. |
 | `npm run build` | Regenerates `src/gen/data.js` from `data/world.json` and builds the game |
-| `npm run test:node` | Simulation tests: belts and material flow, cells, office suites, relocation, rare code paths, and the 24-month balance test |
+| `npm run test:node` | Simulation tests: belts and material flow, cells, office suites, relocation, rare code paths, old saves, the sim performance budget, and the 24-month balance test |
 | `npm run test:ui` | Browser tests with Playwright, including axe-core accessibility audits (zero violations allowed) |
 
 If Playwright can't find its browser, set `CHROMIUM_PATH` to a Chromium or Chrome binary.
@@ -44,7 +44,11 @@ If Playwright can't find its browser, set `CHROMIUM_PATH` to a Chromium or Chrom
 4. **Change the world in data, not code.** Items, recipes, lines, jobs, offices, events and scenarios live in
    `data/world.json`. Edit it, run `npm run gen`, and check `node test/long.mjs` still passes its balance bands.
    Explain design changes in `docs/design/`. Never edit `src/gen/data.js` by hand.
-5. **Tests look things up by role, not by id.** Use the helpers in `test/lib.mjs` (`chainPair()`, `hire(st, 'operator')`,
+5. **Never break a save.** If you change what's stored in the game state, bump `VERSION` in `src/sim/game.js`, add a
+   migration step in `migrate()`, and keep the old fixtures in `test/fixtures/` loading (`node test/saves.mjs`).
+6. **Stay inside the performance budget:** a sim tick under 4 ms (`node test/perf.mjs`) and a floor frame under 16 ms
+   (`python3 test/perf_ui_test.py`), on the largest building with 40 machines.
+7. **Tests look things up by role, not by id.** Use the helpers in `test/lib.mjs` (`chainPair()`, `hire(st, 'operator')`,
    `recipeOf('desk_lamp')`), so a test survives changes to the world data.
 
 ## Pull requests

@@ -58,12 +58,14 @@ function run(seed, cityName, difficulty) {
   hire(st, 'operator', 1.03); hire(st, 'sales', 1.03); hire(st, 'finance', 1.03);
   G.purchaseAll(st);
   const checkNaN = (o, path = '') => { for (const [k, v] of Object.entries(o)) { if (typeof v === 'number' && !Number.isFinite(v)) throw new Error('NaN at ' + path + k); if (v && typeof v === 'object') checkNaN(v, path + k + '.'); } };
-  let lastM = monthKey(st.time), grew = 0, overLimit = 0;
+  let lastM = monthKey(st.time), grew = 0, overLimit = 0, stallMax = 0, stallTotal = 0;
   const months = [];
   for (let d = 0; d < 731 && !st.over; d++) {
     G.advance(st, 1440);
     if (d % 7 === 4) G.purchaseAll(st);
-    for (const m of st.memos) if (!m.seen) { m.seen = 1; if (m.kind === 'raise' && !m.data.done) G.answerRaise(st, m.id, true); }
+    let stallToday = 0; // "Machine stopped" notices that arrived today (the plant may send at most three a day)
+    for (const m of st.memos) if (!m.seen) { m.seen = 1; if (/^(Machine stopped|\d+ machines stopped)/.test(m.subject)) stallToday++; if (m.kind === 'raise' && !m.data.done) G.answerRaise(st, m.id, true); }
+    stallMax = Math.max(stallMax, stallToday); stallTotal += stallToday;
     if (st.strike && d % 5 === 0) G.settleStrike(st);
     if (st.bank.credit > G.creditLimit(st)) overLimit++;
     if (monthKey(st.time) !== lastM) {
@@ -111,7 +113,7 @@ function run(seed, cityName, difficulty) {
     console.log('over', st.over, 'score', money(G.score(st)), 'lines', machines.map(o => ITEMS[RECIPES[o.recipe].out].name).join(', '));
     console.log('save bytes', JSON.stringify(st).length, 'firms alive', st.city.firms.filter(f => f.alive).length, '/', st.city.firms.length);
   }
-  return { st, start, months, overLimit, priceRatios, machines };
+  return { st, start, months, overLimit, priceRatios, machines, stallMax, stallTotal };
 }
 
 if (verbose) { run(seedArg, cityArg || 'Dayton', diffArg || 'normal'); process.exit(0); }
@@ -124,6 +126,7 @@ for (const [seed, city] of runs) {
   ok(!r.st.over && M.length >= 24, `${tag}: still trading after ${M.length} months`);
   ok(Math.min(...nw.slice(0, 6)) >= r.start * BANDS.earlyFloor, `${tag}: net worth never falls below ${BANDS.earlyFloor * 100}% of the start in the first six months (lowest ${money(Math.min(...nw.slice(0, 6)))})`);
   ok(r.overLimit === 0, `${tag}: credit line never over its limit`);
+  ok(r.stallMax <= 3, `${tag}: at most 3 stalled-machine notices on any day (most ${r.stallMax}, ${r.stallTotal} in two years)`);
   const end = last.nw / r.start;
   ok(end >= BANDS.endMin && end <= BANDS.endMax, `${tag}: net worth after 24 months is ${end.toFixed(2)}× the start (band ${BANDS.endMin}–${BANDS.endMax}×)`);
   const early = M.slice(3, 9).reduce((s, x) => s + x.sales, 0) / 6, late = M.slice(18, 24).reduce((s, x) => s + x.sales, 0) / 6;

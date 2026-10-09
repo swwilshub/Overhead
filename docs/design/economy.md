@@ -61,7 +61,7 @@ A machine's rated output is its price × `outputRate` (0.8%) in dollars of produ
 that ÷ the product's base unit price. Actual output is the rating × efficiency. Efficiency is set by:
 
 - the operator's skill and morale;
-- a Shift Supervisor's boost;
+- a Floor Supervisor's boost;
 - the machine's service level (credits, kept up by a mechanic);
 - time lost carrying boxes;
 - materials running out, or the output tray filling.

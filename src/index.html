@@ -50,6 +50,8 @@ p { margin: 0; max-width: 68ch }
 a { color: var(--accent) }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* a comma heard but not seen, between a repeated button's text and its row (dom.js nameBy) */
+.named-by > .nb::after { content: ""; content: "" / ","; }
 .skip { position: absolute; left: 8px; top: -60px; z-index: 50; background: var(--accent); color: var(--accent-ink); padding: 8px 12px; border-radius: var(--radius); }
 .skip:focus { top: 8px }
 .num, td.n, th.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }

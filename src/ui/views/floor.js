@@ -1,15 +1,17 @@
-import { h, table, kv, announce, describe, confirmBox, pill, meter, field } from '../dom.js';
-import { app, go, render as rerender, act, reducedMotion, setupProblems } from '../app.js';
+import { h, frag, table, kv, announce, describe, confirmBox, pill, meter, field, nameBy } from '../dom.js';
+import { app, go, render as rerender, act, reducedMotion, setupProblems, shortcutsOn, navPending } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
-import { JOBS, hasRole, canRunMachine, jobFor, deptColor, DEPT_LIST } from '../../core/content.js';
+import { JOBS, hasRole, canRunMachine, jobFor, deptColor, DEPT_LIST, aOrAn } from '../../core/content.js';
 import { KINDS, ZONE, ZONE_INFO, OFFICES, footprint, ports, rotSize, placementProblem, zoneProblem, describeTile, objectAt, objectLabel, links, beltSummary, inputPorts, portItem, portName, isProducer, storageCapacity, priceOf, inBounds, center, countKind, BOXES_PER_STORAGE_TILE } from '../../sim/floor.js';
+import { stalledMachines, alsoLacking, alsoText } from '../../sim/stalls.js';
 import { unitsPerHour } from '../../sim/world.js';
 import { fullName, skill, activityAt, ACT_LABEL, isWhite } from '../../sim/people.js';
 import { money, num, pct, minuteOfDay, fmtShortDate, fmtDate } from '../../core/util.js';
 import { buyDialog } from './business.js';
 import { sfx } from '../sound.js';
 import { makeView, screenToTile, drawScene, tileXY, itemColor, T as TILE } from '../topdown.js';
+import { confirmCredit, creditToAsk } from '../credit.js';
 import { editing, editorPrimary, editorKey, editorPanel, editorDraw, speakCell, cancelEditor, startEditCell, cellMetrics, suiteMetrics } from './cellEditor.js';
 import { analyseSuite } from '../../sim/suites.js';
 import { workSquare, isStation, itemDef, METRICS } from '../../sim/cells.js';
@@ -50,14 +52,15 @@ export function render() {
     h('button', { type: 'button', 'aria-label': 'Zoom out', 'data-key': 'ft-zo', disabled: v.pix <= 1, onclick: () => { v.pix = Math.max(1, v.pix - 1); rerender({}); } }, '−'),
     h('span', { class: 'num', 'aria-live': 'off' }, v.pix + '×'),
     h('button', { type: 'button', 'aria-label': 'Zoom in', 'data-key': 'ft-zi', disabled: v.pix >= 4, onclick: () => { v.pix = Math.min(4, v.pix + 1); rerender({}); } }, '+'));
-  const help = h('p', { id: helpId, class: 'floor-help' }, 'Arrow keys move the cursor one square (Shift moves five). Enter selects or places. R rotates. M moves the selected item. Delete sells it. Escape cancels.');
+  const help = h('p', { id: helpId, class: 'floor-help' }, 'Arrow keys move the cursor one square (Shift moves five). Enter selects or places. R rotates. M moves the selected item. Delete sells it. Escape cancels. ',
+    shortcutsOn() ? 'Space starts or pauses the clock, and [ ], ? and g then a letter work here too.' : 'Space also selects or places.');
   const fixes = newSite ? [] : setupProblems(st);
   const siteTabs = st.move ? h('div', { class: 'site-tabs', role: 'tablist', 'aria-label': 'Which building' },
     [['old', `Current plant · ${st.city.lots[st.lotId].addr}`], ['new', `New site · ${st.city.lots[st.move.lotId].addr} · ${Math.round(G.moveProgress(st) * 100)}% built`]].map(([k, label]) =>
       h('button', { type: 'button', role: 'tab', 'aria-selected': String((v.site || 'old') === k), 'data-key': 'site-' + k, onclick: () => { v.site = k; v.sel = null; followId = null; rerender({}); document.getElementById('floor-app')?.focus(); announce(k === 'new' ? 'Showing the new site under construction.' : 'Showing the current plant.', 'polite', false); } }, label))) : null;
   return h('div', { class: 'stack' },
     h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Factory floor'), h('p', null, `${st.city.lots[st.lotId].addr} · ${num(st.city.lots[st.lotId].sqft)} sq ft · storage ${num(G.boxesStored(st))} of ${num(storageCapacity(fl))} boxes`))),
-    fixes.length ? h('div', { class: 'notice', role: 'region', 'aria-label': 'Setup issues' }, h('strong', null, 'Needs attention: '), h('ul', { style: { margin: '4px 0 0', paddingLeft: '1.2em' } }, fixes.map(f => h('li', null, f.text, ' ', h('button', { class: 'link', type: 'button', onclick: () => { if (f.obj) { const o = fl.objects.find(o => o.id === f.obj); selectObj(o); } else go(f.view); } }, f.obj ? 'Show me' : 'Fix'))))) : null,
+    h('div', { id: 'needs-wrap', 'data-sig': needsSig(fixes) }, needsAttention(st, fixes)),
     h('div', { class: 'floor-layout' },
       h('div', { class: 'stack', style: { minWidth: 0 } }, siteTabs, newSite ? null : tools, appEl, help, legend()),
       h('aside', { class: 'stack', 'aria-label': editing() ? 'Cell blueprint' : newSite ? 'Construction' : 'Inspector', id: 'inspector' }, newSite ? movePanel(st) : editing() ? editorPanel(st) : inspector(st, v))),
@@ -88,7 +91,7 @@ function setMode(m) {
 function legend() {
   return h('div', { class: 'legend', 'aria-label': 'Legend' },
     h('span', null, h('i', { style: { background: 'repeating-linear-gradient(-45deg, var(--hazard) 0 3px, var(--hazard-ink) 3px 6px)' } }), 'Safety zone'),
-    h('span', null, h('i', { style: { background: '#b08a5a' } }), 'Storage (pallets)'),
+    h('span', null, h('i', { style: { background: '#b08a5a' } }), 'Storage zone'),
     h('span', null, h('i', { style: { background: '#2b6cb0' } }), 'Blue arrow: machine input'), h('span', null, h('i', { style: { background: '#2f8a4f' } }), 'Green arrow: output'),
     h('span', null, h('i', { style: { background: '#5d636a' } }), "Grey pad: operator's post"), h('span', null, h('i', { style: { background: '#c47b16' } }), 'Orange cross: service hatch'),
     h('span', null, 'Bars above a machine show each input\'s stock (full means 16 hours or more). The lamp on its front is green when running, red when broken'),
@@ -102,11 +105,12 @@ function wireCanvas(el, st, v, view) {
   canvas.addEventListener('pointerdown', e => { if (e.button === 2) return; el.focus(); const [x, y] = toTile(e); v.cx = x; v.cy = y; dragging = true; primary(st, v); });
   canvas.addEventListener('contextmenu', e => { e.preventDefault(); cancel(v); });
   el.addEventListener('keydown', e => {
+    if (navPending(e)) return; // the key after g belongs to navigation (app.js), so g m doesn't start a move
     const fl = onNewSite(st, v) ? st.move.floor : st.floor; const step = e.shiftKey ? 5 : 1;
     const mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
     if (v.mode === 'cell' && editorKey(e, st)) return;
     if (mv) { lastKeyNav = performance.now(); e.preventDefault(); const nx = Math.max(0, Math.min(fl.w - 1, v.cx + mv[0])), ny = Math.max(0, Math.min(fl.h - 1, v.cy + mv[1])); sfx(nx === v.cx && ny === v.cy ? 'bump' : 'tick'); v.cx = nx; v.cy = ny; scrollToCursor(); speakCursor(st, v); return; }
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); primary(st, v); return; }
+    if (e.key === 'Enter' || (e.key === ' ' && !shortcutsOn())) { e.preventDefault(); primary(st, v); return; } // with shortcuts on, Space runs the clock
     if (e.key === 'Escape') { e.preventDefault(); cancel(v); return; }
     if (e.key === 'r' || e.key === 'R') { e.preventDefault(); v.rot = (v.rot + 1) % 4; announce(`Rotated to ${v.rot * 90} degrees.`, 'polite', false); speakCursor(st, v); return; }
     if ((e.key === 'm' || e.key === 'M') && v.sel) { e.preventDefault(); beginMove(st, v); return; }
@@ -131,6 +135,7 @@ function speakCursor(st, v) {
     if (v.mode === 'place' || v.mode === 'move') { const p = ghostProblem(st, v); msg += p ? ` Cannot place: ${p}` : ' Placement OK.'; }
     if (v.mode === 'zone') { const p = zoneProblem(st.floor, v.cx, v.cy, v.zone); if (p) msg += ' ' + p; }
     describe(msg);
+    if (!v.sel) updateInspector(); // the Cursor card says what the announcement says, even with the clock stopped
   }, 140);
 }
 function ghostSpec(v) {
@@ -149,7 +154,7 @@ function primary(st, v, drag = false) {
     const i = v.cy * fl.w + v.cx; if (fl.zones[i] === v.zone) return;
     if (fl.zones[i] === ZONE.STORAGE && v.zone !== ZONE.STORAGE) {
       const after = storageCapacity(fl) - BOXES_PER_STORAGE_TILE;
-      if (after < G.boxesStored(st)) { if (!drag) announce("Can't clear a storage square that holds pallets. Move stock out first.", 'assertive'); return; }
+      if (after < G.boxesStored(st)) { if (!drag) announce("Can't clear that storage zone square: the rest of storage can't hold your stock. Sell or use some stock first.", 'assertive'); return; }
     }
     const p = zoneProblem(fl, v.cx, v.cy, v.zone); if (p) { if (!drag) announce(p, 'assertive'); return; }
     fl.zones[i] = v.zone; fl.rev++; sfx('paint');
@@ -157,11 +162,10 @@ function primary(st, v, drag = false) {
     app.dirty = true; return;
   }
   if (v.mode === 'place') {
-    const g = ghostSpec(v); const r = G.placeEquipment(st, g);
-    if (!r.ok) { if (!drag) act(r); return; }
-    sfx(r.obj.kind === 'conveyor' ? 'belt' : 'place'); announce(`${objectLabel(st, r.obj)} placed for ${money(priceOf(r.obj))}.`);
-    if (r.linked?.length) { sfx('ok'); announce(r.linked.map(l => l.text).join(' '), 'polite'); }
-    if (!v.placing.repeat) { v.mode = 'select'; v.placing = null; v.sel = r.obj.id; rerender({}); document.getElementById('floor-app')?.focus(); }
+    const g = ghostSpec(v);
+    // borrowing needs a yes first; once given, the rest of this placing session (one belt run) doesn't ask again
+    if (v.creditFor !== v.placing && !placementProblem(st.floor, g) && creditToAsk(st, priceOf(g))) { askCredit(st, v, g); return; }
+    placeGhost(st, v, g, drag);
     return;
   }
   if (v.mode === 'move') {
@@ -173,6 +177,25 @@ function primary(st, v, drag = false) {
   v.sel = o ? o.id : null;
   if (o) announce(`Selected ${objectLabel(st, o)}. Press I for details, M to move, Delete to sell.`, 'polite', false);
   updateInspector();
+}
+function placeGhost(st, v, g, drag) {
+  const r = G.placeEquipment(st, g);
+  if (!r.ok) { if (!drag) act(r); return; }
+  sfx(r.obj.kind === 'conveyor' ? 'belt' : 'place'); announce(`${objectLabel(st, r.obj)} placed for ${money(priceOf(r.obj))}.`);
+  if (r.linked?.length) { sfx('ok'); announce(r.linked.map(l => l.text).join(' '), 'polite'); }
+  if (!v.placing.repeat) { v.mode = 'select'; v.placing = null; v.sel = r.obj.id; rerender({}); document.getElementById('floor-app')?.focus(); }
+}
+let asking = false;
+async function askCredit(st, v, g) {
+  if (asking) return;
+  asking = true; dragging = false;
+  const spec = v.placing;
+  try {
+    if (!(await confirmCredit(st, priceOf(g)))) return;
+    if (v.mode !== 'place' || v.placing !== spec) return;
+    v.creditFor = spec;
+    placeGhost(st, v, g, false);
+  } finally { asking = false; }
 }
 function cancel(v) {
   if (v.mode === 'cell') { editorKey({ key: 'Escape', preventDefault() {} }, app.st); return; }
@@ -198,7 +221,21 @@ export function selectObj(o) {
 }
 
 // ---------- inspector
-function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(inspector(st, v)); }
+// The list of things that need the owner, in its own container so a light refresh can swap it without a redraw.
+function needsAttention(st, fixes) {
+  const fl = st.floor;
+  return fixes.length ? h('div', { class: 'notice', role: 'region', 'aria-label': 'Setup issues' }, h('strong', null, 'Needs attention: '), h('ul', { style: { margin: '4px 0 0', paddingLeft: '1.2em' } }, fixes.map(f => { const t = h('span', null, f.text); return h('li', null, t, ' ', nameBy(h('button', { class: 'link', type: 'button', onclick: () => { if (f.obj) { const o = fl.objects.find(o => o.id === f.obj); selectObj(o); } else go(f.view); } }, f.obj ? 'Show me' : 'Fix'), t)); }))) : null;
+}
+const needsSig = fixes => fixes.map(f => f.text + '|' + (f.obj ?? f.view)).join('\n');
+function updateNeeds() {
+  const wrap = document.getElementById('needs-wrap'), st = app.st; if (!wrap || !st?.floor || st.move) return;
+  const fixes = setupProblems(st), sig = needsSig(fixes);
+  if (sig === wrap.dataset.sig) return;
+  // never take focus from the list: if the player is on one of its buttons, try again on the next refresh
+  if (wrap.contains(document.activeElement)) return;
+  wrap.dataset.sig = sig; wrap.replaceChildren(...[needsAttention(st, fixes)].filter(Boolean));
+}
+function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(frag(inspector(st, v))); }
 function inspector(st, v) {
   const o = v.sel ? st.floor.objects.find(o => o.id === v.sel) : null;
   if (!o) return [checklist(st), h('section', { class: 'card' }, h('h2', { tabindex: -1 }, 'Cursor'), h('p', null, `Column ${v.cx + 1}, row ${v.cy + 1}: ${describeTile(st, v.cx, v.cy)}`))];
@@ -211,17 +248,17 @@ function inspector(st, v) {
     card.append(h('p', null, OFFICES[o.officeType].desc), kv([['Occupant', occ ? `${fullName(occ)}, ${JOBS[occ.job].title}` : 'Empty'], ['Value', money(o.value)]]));
     const cands = st.employees.filter(e => isWhite(e));
     const sel = h('select', { id: 'office-occ' }, h('option', { value: '' }, 'Nobody'), cands.map(e => h('option', { value: e.id, selected: occ?.id === e.id }, `${fullName(e)} (${JOBS[e.job].title})`)));
-    card.append(field('Assign office to', sel), h('button', { type: 'button', onclick: () => { const id = sel.value ? +sel.value : null; if (occ && occ.id !== id) G.assign(st, occ.id, null); if (id) act(G.assign(st, id, o.id)); else { act({ ok: true, msg: 'Office cleared.' }); } } }, 'Assign'));
+    card.append(field('Assign office to', sel), h('button', { type: 'button', 'data-key': 'office-assign', onclick: () => { const id = sel.value ? +sel.value : null; if (occ && occ.id !== id) G.assign(st, occ.id, null); if (id) act(G.assign(st, id, o.id)); else { act({ ok: true, msg: 'Office cleared.' }); } } }, 'Assign'));
   } else if (o.fixed) {
     const d = { breakroom: 'Where staff eat lunch and take coffee breaks.', restroom: 'Staff need it a couple of times a day.', dock: 'Deliveries arrive here and shipments leave from here.', exit: 'Smokers without a smoking zone step outside here.' }[o.kind];
     card.append(h('p', null, d));
   } else {
-    const d = { conveyor: 'Carries items along a line of belt squares. A line must touch a machine output square at one end and another machine input square, or a storage bin, at the other.', bin: 'Links a belt line to the warehouse. On an input line it feeds the machine from storage; on an output line it takes goods to storage. Either way, nobody carries boxes.', handcart: 'With a pallet jack the crew moves two boxes a trip instead of one. One jack serves about three machines.', forklift: 'The fastest way to move pallets. One serves about four machines.' }[o.kind];
+    const d = { conveyor: 'Carries items along a line of belt squares. A line must touch a machine output square at one end and another machine input square, or a storage bin, at the other.', bin: 'Links a belt line to storage. On an input line it feeds the machine from storage; on an output line it takes goods to storage. Either way, nobody carries boxes.', handcart: 'With a pallet jack, operators carry two boxes a trip instead of one. One pallet jack serves about three machines.', forklift: 'The fastest way to move pallets. One serves about four machines.' }[o.kind];
     card.append(h('p', null, d));
     if (o.kind === 'conveyor' || o.kind === 'bin') card.append(beltLineCard(st, o));
     card.append(kv([['Value', money(o.value)], ['Bought', fmtShortDate(o.bought)]]));
   }
-  if (!o.fixed) card.append(h('div', { class: 'row' }, o.kind === 'cell' || o.kind === 'suite' ? null : h('button', { type: 'button', onclick: () => beginMove(st, vs()) }, 'Move'), h('button', { type: 'button', class: 'danger', onclick: () => sellSelected(st, vs()) }, st.time - o.bought < 1440 ? 'Return for refund' : `Sell (${money(o.value)})`)));
+  if (!o.fixed) card.append(h('div', { class: 'row' }, o.kind === 'cell' || o.kind === 'suite' ? null : h('button', { type: 'button', 'data-key': 'obj-move', onclick: () => beginMove(st, vs()) }, 'Move'), h('button', { type: 'button', class: 'danger', 'data-key': 'obj-sell', onclick: () => sellSelected(st, vs()) }, st.time - o.bought < 1440 ? 'Return for refund' : `Sell (${money(o.value)})`)));
   return card;
 }
 function suiteInspector(st, o, card) {
@@ -232,7 +269,7 @@ function suiteInspector(st, o, card) {
   const free = st.employees.filter(e => isWhite(e) && e.assign !== o.id);
   const sel = h('select', { id: 'suite-add' }, free.map(e => h('option', { value: e.id }, `${fullName(e)} (${JOBS[e.job].title}${e.assign ? ', has an office' : ''})`)));
   card.append(h('div', { class: 'stack', style: { gap: '6px' }, role: 'group', 'aria-labelledby': 'occ-h' }, h('h3', { id: 'occ-h' }, `Occupants (${staff.length} of ${a.seats})`),
-    staff.length ? h('ol', { class: 'port-list' }, staff.map((e, i) => h('li', null, `Desk ${i + 1}: ${fullName(e)}, ${JOBS[e.job].title} `, h('button', { type: 'button', class: 'link', onclick: () => { G.assign(st, e.id, null); act({ ok: true, msg: `${fullName(e)} moved out of suite #${o.id}.` }); } }, 'Move out')))) : h('p', { class: 'muted' }, 'Nobody yet.'),
+    staff.length ? h('ol', { class: 'port-list' }, staff.map((e, i) => { const t = h('span', null, `Desk ${i + 1}: ${fullName(e)}, ${JOBS[e.job].title}`); return h('li', null, t, ' ', nameBy(h('button', { type: 'button', class: 'link', 'data-key': 'suite-out-' + e.id, onclick: () => { G.assign(st, e.id, null); act({ ok: true, msg: `${fullName(e)} moved out of suite #${o.id}.` }); } }, 'Move out'), t)); })) : h('p', { class: 'muted' }, 'Nobody yet.'),
     staff.length < a.seats && free.length ? [field('Give a desk to', sel), h('button', { type: 'button', 'data-key': 'suite-add', onclick: () => { const id = +sel.value; const e = st.employees.find(x => x.id === id); if (e.assign) G.assign(st, id, null); act(G.assign(st, id, o.id)); } }, 'Assign desk')]
       : staff.length >= a.seats ? h('p', { class: 'muted' }, 'Every desk is taken. Add a desk to seat more people.') : h('button', { class: 'link', type: 'button', onclick: () => go('hire') }, 'Hire office staff')));
   card.append(kv([['Value', money(o.value)], ['Built', fmtShortDate(o.bought)]]));
@@ -250,13 +287,13 @@ function cellInspector(st, o, card) {
   const eligible = st.employees.filter(e => canRunMachine(e) && e.assign !== o.id);
   const sel = h('select', { id: 'cell-crew-add' }, eligible.map(e => h('option', { value: e.id }, `${fullName(e)} (${JOBS[e.job].title}${e.assign ? ', busy elsewhere' : ''})`)));
   card.append(h('div', { class: 'stack', style: { gap: '6px' }, role: 'group', 'aria-labelledby': 'crew-h' }, h('h3', { id: 'crew-h' }, `Crew (${crew.length})`),
-    crew.length ? h('ul', { class: 'port-list' }, crew.map(e => h('li', null, `${fullName(e)}, ${JOBS[e.job].title} `, h('button', { type: 'button', class: 'link', onclick: () => { G.assign(st, e.id, null); act({ ok: true, msg: `${fullName(e)} taken off cell #${o.id}.` }); } }, 'Remove')))) : h('p', { class: 'muted' }, 'Nobody yet. A cell needs at least one operator.'),
+    crew.length ? h('ul', { class: 'port-list' }, crew.map(e => { const t = h('span', null, `${fullName(e)}, ${JOBS[e.job].title}`); return h('li', null, t, ' ', nameBy(h('button', { type: 'button', class: 'link', 'data-key': 'crew-out-' + e.id, onclick: () => { G.assign(st, e.id, null); act({ ok: true, msg: `${fullName(e)} taken off ${objectLabel(st, o)}.` }); } }, 'Remove'), t)); })) : h('p', { class: 'muted' }, 'Nobody yet. A cell needs at least one operator.'),
     eligible.length ? [field('Add to crew', sel, `This layout can use up to ${a.opsUseful} operator${a.opsUseful > 1 ? 's' : ''}.`), h('button', { type: 'button', 'data-key': 'cell-crew', onclick: () => { const id = +sel.value; const e = st.employees.find(x => x.id === id); if (e.assign) G.assign(st, id, null); act(G.assign(st, id, o.id)); } }, 'Add operator')]
-      : h('button', { class: 'link', type: 'button', onclick: () => go('hire') }, 'Hire an operator')));
+      : h('button', { class: 'link', type: 'button', onclick: () => go('hire') }, `Hire ${aOrAn(jobFor('operator').title)}`)));
   // product
   const fam = RECIPES.filter(x => x.family === o.family);
   const prodSel = h('select', { id: 'mach-prod' }, fam.map(x => h('option', { value: x.id, selected: x.id === o.recipe, disabled: !G.recipeAvailable(st, x.id) }, `${ITEMS[x.out].name}${G.recipeAvailable(st, x.id) ? ` (sells ~${money(st.city.market[x.out].price)})` : ' (needs research on a machine)'}`)));
-  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Product', prodSel, `Retooling costs ${money(Math.round(FAMILIES[o.family].price * 0.08))}.`), h('button', { type: 'button', onclick: () => act(G.setRecipe(st, o.id, +prodSel.value), false, 'retool') }, 'Retool')));
+  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Product', prodSel, `Retooling costs ${money(Math.round(FAMILIES[o.family].price * 0.08))}.`), h('button', { type: 'button', 'data-key': 'mach-retool', onclick: () => act(G.setRecipe(st, o.id, +prodSel.value), false, 'retool') }, 'Retool')));
   card.append(kv([['Made this month', num(o.producedMonth)], ['Made in total', num(o.produced)], ['Maintenance', o.broken ? `Broken, repair ${Math.round(o.repair * 100)}%` : `${Math.round(o.credits)}% serviced`], ['Value', money(o.value)]]));
 }
 function machineInspector(st, o, card) {
@@ -274,28 +311,28 @@ function machineInspector(st, o, card) {
   // operator
   const eligible = st.employees.filter(e => (o.mode === 'research' ? hasRole(e, 'researcher') : canRunMachine(e)));
   const opSel = h('select', { id: 'mach-op' }, h('option', { value: '' }, 'Nobody'), eligible.map(e => h('option', { value: e.id, selected: op?.id === e.id }, `${fullName(e)} (${JOBS[e.job].title}${e.assign && e.assign !== o.id ? ', busy' : ''})`)));
-  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field(o.mode === 'research' ? 'Engineer' : 'Operator', opSel), h('div', { class: 'row' }, h('button', { type: 'button', onclick: () => { const id = opSel.value ? +opSel.value : null; if (op && op.id !== id) G.assign(st, op.id, null); if (id) { const e = st.employees.find(x => x.id === id); if (e.assign) G.assign(st, id, null); act(G.assign(st, id, o.id)); } else act({ ok: true, msg: 'Machine has no operator now.' }); } }, 'Assign'),
-    !eligible.length ? h('button', { class: 'link', type: 'button', onclick: () => go('hire') }, o.mode === 'research' ? 'Hire a researcher' : 'Hire an operator') : null)));
+  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field(o.mode === 'research' ? jobFor('researcher').title : 'Operator', opSel), h('div', { class: 'row' }, h('button', { type: 'button', 'data-key': 'mach-assign', onclick: () => { const id = opSel.value ? +opSel.value : null; if (op && op.id !== id) G.assign(st, op.id, null); if (id) { const e = st.employees.find(x => x.id === id); if (e.assign) G.assign(st, id, null); act(G.assign(st, id, o.id)); } else act({ ok: true, msg: 'Machine has no operator now.' }); } }, 'Assign'),
+    !eligible.length ? h('button', { class: 'link', type: 'button', onclick: () => go('hire') }, `Hire ${aOrAn(jobFor(o.mode === 'research' ? 'researcher' : 'operator').title)}`) : null)));
   // product / research
   const fam = RECIPES.filter(x => x.family === o.family);
   const prodSel = h('select', { id: 'mach-prod' }, fam.map(x => h('option', { value: x.id, selected: x.id === o.recipe && o.mode === 'produce', disabled: !G.recipeAvailable(st, x.id) }, `${ITEMS[x.out].name}${G.recipeAvailable(st, x.id) ? ` (sells ~${money(st.city.market[x.out].price)})` : ' (needs research)'}`)));
-  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Product', prodSel, `Retooling costs ${money(Math.round(FAMILIES[o.family].price * 0.08))}.`), h('button', { type: 'button', onclick: () => act(G.setRecipe(st, o.id, +prodSel.value), false, 'retool') }, 'Retool')));
+  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Product', prodSel, `Retooling costs ${money(Math.round(FAMILIES[o.family].price * 0.08))}.`), h('button', { type: 'button', 'data-key': 'mach-retool', onclick: () => act(G.setRecipe(st, o.id, +prodSel.value), false, 'retool') }, 'Retool')));
   const locked = fam.filter(x => !G.recipeAvailable(st, x.id));
   if (locked.length) {
     const rs = h('select', { id: 'mach-res' }, locked.map(x => h('option', { value: x.id }, ITEMS[x.out].name + (st.city.aiKnown[x.id] ? ' (known in town: faster)' : ''))));
-    card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Research a new product', rs, `Needs a ${jobFor('researcher').title} at this machine, and stops production while it runs.`), h('button', { type: 'button', onclick: () => act(G.startResearch(st, o.id, +rs.value), false, 'retool') }, 'Start research')));
+    card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Research a new product', rs, `Needs ${aOrAn(jobFor('researcher').title)} at this machine, and stops production while it runs.`), h('button', { type: 'button', 'data-key': 'mach-research', onclick: () => act(G.startResearch(st, o.id, +rs.value), false, 'retool') }, 'Start research')));
   }
 }
 // ---------- belt lines
-const nameOf = (st, id) => { const q = st.floor.objects.find(x => x.id === id); return !q ? '#' + id : q.kind === 'bin' ? `storage bin #${id}` : `${FAMILIES[q.family].name} #${id}`; };
+const nameOf = (st, id) => { const q = st.floor.objects.find(x => x.id === id); return !q ? `item #${id}` : q.kind === 'bin' ? `storage bin #${id}` : objectLabel(st, q); };
 function routeLine(st, r) {
   const fl = st.floor, a = fl.objects.find(x => x.id === r.from), b = fl.objects.find(x => x.id === r.to);
-  const port = r.k != null ? ` input ${r.k + 1}` : '';
+  const port = r.k != null ? `input ${r.k + 1} of ` : '';
   let items;
   if (r.kind === 'fromBin') { const it = portItem(b, r.k); items = it != null ? `${ITEMS[it].name} from storage` : 'nothing: this input is unused by the current product'; }
   else if (r.kind === 'bin') items = 'output to storage';
   else { const it = a?.recipe != null ? RECIPES[a.recipe].out : null, want = portItem(b, r.k); items = it != null && it === want ? ITEMS[it].name : `nothing yet: input ${r.k + 1} takes ${want != null ? ITEMS[want].name : 'nothing for this product'}, not ${it != null ? ITEMS[it].name : 'this output'}`; }
-  return `${nameOf(st, r.from)} → ${nameOf(st, r.to)}${port}: ${items}, ${r.path.length} squares`;
+  return `${nameOf(st, r.from)} → ${port}${nameOf(st, r.to)}: ${items}, ${r.path.length} squares`;
 }
 function beltLineCard(st, o) {
   const fl = st.floor, L = links(fl);
@@ -328,20 +365,20 @@ function machineBelts(st, o) {
     const good = (f?.sources || []).filter(id => byId(id)?.recipe != null && RECIPES[byId(id).recipe].out === it);
     const wrong = (f?.sources || []).filter(id => !good.includes(id));
     let how;
-    if (good.length) how = pill(`Belt from #${good.join(', #')}`, 'ok', '⇢');
+    if (good.length) how = pill(`Belt from ${good.map(id => nameOf(st, id)).join(', ')}`, 'ok', '⇢');
     else if (f?.bin) how = pill('Belt from storage', 'ok', '⇢');
     else how = pill(fl.zones[y * fl.w + x] === ZONE.SAFETY ? 'By hand, safety zone' : 'By hand, no safety zone', fl.zones[y * fl.w + x] === ZONE.SAFETY ? 'mute' : 'warn', fl.zones[y * fl.w + x] === ZONE.SAFETY ? '' : '!');
-    const note = wrong.length ? h('div', { class: 'muted' }, `The belt from #${wrong.join(', #')} brings ${wrong.map(id => byId(id).recipe != null ? ITEMS[RECIPES[byId(id).recipe].out].name : 'nothing').join(', ')}, which this input doesn't take.`) : null;
+    const note = wrong.length ? h('div', { class: 'muted' }, `The belt from ${wrong.map(id => nameOf(st, id)).join(', ')} brings ${wrong.map(id => byId(id).recipe != null ? ITEMS[RECIPES[byId(id).recipe].out].name : 'nothing').join(', ')}, which this input doesn't take.`) : null;
     return h('li', null, swatch(it), h('strong', null, `Input ${k + 1}: ${ITEMS[it].name}`), ` (${r.inputs[k][1]} per ${r.outQty > 1 ? r.outQty + ' units' : 'unit'}) `, how, note);
   });
   const outTo = L.routes.filter(x => x.from === o.id && x.kind === 'machine' && portItem(byId(x.to), x.k) === r.out);
   const outRow = h('li', null, swatch(r.out), h('strong', null, `Output: ${ITEMS[r.out].name} `),
-    outTo.length ? pill(`Belt to ${outTo.map(x => `#${x.to} input ${x.k + 1}`).join(', ')}`, 'ok', '⇢') : L.outBin[o.id] ? pill('Belt to storage', 'ok', '⇢') : pill('By hand to the warehouse', 'mute'));
+    outTo.length ? pill(`Belt to ${outTo.map(x => `input ${x.k + 1} of ${nameOf(st, x.to)}`).join(', ')}`, 'ok', '⇢') : L.outBin[o.id] ? pill('Belt to storage', 'ok', '⇢') : pill('By hand to storage', 'mute'));
   wrap.append(h('ul', { class: 'port-list' }, rows, outRow));
   // what is physically on the belts leaving this machine, and whether they are backed up
   for (const ln of Object.values(st.lanes || {}).filter(l => l.from === o.id && l.kind !== 'fromBin')) {
     const n = ln.boxes.length, stuck = ln.boxes.filter(b => !b.moving).length, cap = Math.floor(ln.len / G.BOX_GAP) + 1;
-    const dest = ln.kind === 'end' ? 'a belt that goes nowhere' : ln.kind === 'bin' ? `storage bin #${ln.to}` : `#${ln.to} input ${ln.k + 1}`;
+    const dest = ln.kind === 'end' ? 'a belt that goes nowhere' : ln.kind === 'bin' ? `storage bin #${ln.to}` : `input ${ln.k + 1} of ${nameOf(st, ln.to)}`;
     wrap.append(h('p', { class: stuck >= cap - 1 ? 'sup-alert' : 'muted', role: stuck >= cap - 1 ? 'status' : null },
       `Belt to ${dest}: ${n} box${n === 1 ? '' : 'es'} on it${stuck ? `, ${stuck} standing still` : ''}.`, stuck >= cap - 1 ? ' It is jammed: nothing at the far end is taking the boxes, so this machine will stop when its tray fills.' : ''));
   }
@@ -361,7 +398,7 @@ function machineBelts(st, o) {
     const srcs = fl.objects.filter(q => q.id !== o.id && ((isProducer(q) && q.recipe != null && RECIPES[q.recipe].out === it) || q.kind === 'bin'));
     const already = new Set([...(pf[k]?.sources || []), ...(pf[k]?.bin ? fl.objects.filter(q => q.kind === 'bin').map(q => q.id) : [])]);
     const list = srcs.filter(q => !already.has(q.id));
-    if (list.length) feedOpts.push(h('optgroup', { label: `Input ${k + 1}: ${ITEMS[it].name}` }, list.map(q => h('option', { value: `${q.id}:${k}` }, q.kind === 'bin' ? `from storage bin #${q.id}` : `from ${FAMILIES[q.family].name} #${q.id}`))));
+    if (list.length) feedOpts.push(h('optgroup', { label: `Input ${k + 1}: ${ITEMS[it].name}` }, list.map(q => h('option', { value: `${q.id}:${k}` }, q.kind === 'bin' ? `from storage bin #${q.id}` : `from ${objectLabel(st, q)}`))));
   });
   if (feedOpts.length) {
     const sel = h('select', { id: 'belt-feed' }, feedOpts);
@@ -373,7 +410,7 @@ function machineBelts(st, o) {
   const linked = new Set([...outTo.map(x => x.to), ...(L.outBin[o.id] ? L.routes.filter(x => x.from === o.id && x.kind === 'bin').map(x => x.to) : [])]);
   const cands = fl.objects.filter(q => q.id !== o.id && !linked.has(q.id) && (uses(q) || q.kind === 'bin')).sort((a, b) => (a.kind === 'bin') - (b.kind === 'bin') || a.id - b.id);
   if (cands.length) {
-    const sel = h('select', { id: 'belt-to' }, cands.map(q => h('option', { value: q.id }, q.kind === 'bin' ? `Storage bin #${q.id} (output to storage)` : `${FAMILIES[q.family].name} #${q.id}, input ${G.inputFor(o, q) + 1} (uses ${ITEMS[r.out].name})`)));
+    const sel = h('select', { id: 'belt-to' }, cands.map(q => h('option', { value: q.id }, q.kind === 'bin' ? `Storage bin #${q.id} (output to storage)` : `${objectLabel(st, q)}, input ${G.inputFor(o, q) + 1} (uses ${ITEMS[r.out].name})`)));
     wrap.append(field(`Send ${ITEMS[r.out].name} by belt to`, sel, 'Goes into the input square that takes this product. Only machines that use it are listed.'),
       h('button', { type: 'button', 'data-key': 'belt-connect', onclick: () => layBelt(st, o.id, +sel.value, null) }, 'Connect output by belt'));
   } else if (!outTo.length && !L.outBin[o.id]) wrap.append(h('p', { class: 'muted' }, `No machine on the floor uses ${ITEMS[r.out].name}. Place one, or a storage bin, to belt the output.`));
@@ -382,8 +419,12 @@ function machineBelts(st, o) {
 async function layBelt(st, from, to, k) {
   const dry = G.connectByBelt(st, from, to, true, k);
   if (!dry.ok) { act(dry); return; }
-  const port = dry.k != null ? ` input ${dry.k + 1}` : '';
-  if (dry.tiles && !(await confirmBox('Lay this belt?', `${dry.tiles} conveyor sections from ${nameOf(st, from)} to ${nameOf(st, to)}${port}, for ${money(dry.price)}.`, `Lay belt (${money(dry.price)})`))) return;
+  const port = dry.k != null ? `input ${dry.k + 1} of ` : '';
+  const text = `${dry.tiles} conveyor sections from ${nameOf(st, from)} to ${port}${nameOf(st, to)}, for ${money(dry.price)}.`;
+  if (dry.tiles) {
+    if (creditToAsk(st, dry.price)) { if (!(await confirmCredit(st, dry.price, { title: 'Lay this belt?', lead: text + ' ', yes: n => `Lay belt and borrow ${money(n)}` }))) return; }
+    else if (!(await confirmBox('Lay this belt?', text, `Lay belt (${money(dry.price)})`))) return;
+  }
   const res = G.connectByBelt(st, from, to, false, k);
   if (res.ok) { sfx('belt'); act({ ok: true, msg: res.linked?.length ? res.linked.map(l => l.text).join(' ') : (res.msg || `Laid ${res.tiles} sections.`) }, false, 'ok'); }
   else act(res);
@@ -391,7 +432,7 @@ async function layBelt(st, from, to, k) {
 }
 
 // ---------- boxes on belts, at machines and in people's hands, all drawn from the simulation's own state
-const belt = { st: null, tag: '', dirs: new Map(), live: new Set(), lastPiles: [] };
+const belt = { st: null, tag: '', dirs: new Map(), live: new Set(), lastPiles: [], drawMs: [] };
 export function beltDebug() { return belt; }
 function beltFrame(st, now, anim) {
   G.refreshLanes(st); // belts laid while the clock is stopped get their lanes straight away
@@ -453,6 +494,12 @@ function tripPose(st, o, t) {
 
 // ---------- stock levels for one machine
 const COVER_SCALE = 16; // hours shown on the bar: two full shifts
+// One status pill says what the machine is doing; this line adds a different problem or a warning, never a second "Stopped".
+function supplyNote(st, o, S) {
+  const l = S.limiting; if (!l || l.status === 'ok') return null;
+  if (l.status === 'bad') { const also = alsoLacking(st, o); return also.length ? h('p', { class: 'sup-alert', role: 'status' }, `Also: ${alsoText(also)}.`) : null; }
+  return h('p', { class: 'sup-alert', role: 'status' }, `${l.name} runs out first, in about ${hrs(l.hours)} at full speed.`);
+}
 export function machineSupply(st, o) {
   const r = RECIPES[o.recipe], fl = st.floor, L = links(fl);
   const rate = unitsPerHour(o.recipe);
@@ -487,19 +534,19 @@ function supplyGraphic(st, o) {
     h('div', { class: 'sup-meta' }, h('strong', null, num(Math.floor(i.have))), ` units (${num(i.boxes)} boxes) · lasts `, h('strong', null, hrs(i.hours)),
       i.shared > 0 ? ` shared with ${i.shared} other machine${i.shared > 1 ? 's' : ''}` : '',
       i.buf > 0 ? ` · ${num(Math.floor(i.buf))} waiting on the belt` : ''),
-    i.belt ? h('div', { class: 'sup-meta' }, `Fed by conveyor from machine #${i.belt.id} into input ${i.k + 1}.`) : i.binFed ? h('div', { class: 'sup-meta' }, `Fed by conveyor from storage into input ${i.k + 1}, no hand carrying.`) : null,
+    i.belt ? h('div', { class: 'sup-meta' }, `Fed by conveyor from ${objectLabel(st, i.belt)} into input ${i.k + 1}.`) : i.binFed ? h('div', { class: 'sup-meta' }, `Fed by conveyor from storage into input ${i.k + 1}, no hand carrying.`) : null,
     i.onOrder ? h('div', { class: 'sup-meta' }, `+ ${num(i.onOrder)} boxes on order, first arriving ${fmtDate(i.nextEta)}.`) : (!i.belt && i.status !== 'ok' ? h('div', { class: 'sup-meta' }, 'Nothing on order. ', h('button', { class: 'link', type: 'button', onclick: () => buyDialog(i.id) }, `Buy ${i.name}`)) : null)));
   const eff = o.effAvg;
   return h('div', { class: 'supply', role: 'group', 'aria-label': 'Stock levels for this machine' },
-    S.limiting && S.limiting.status !== 'ok' ? h('p', { class: 'sup-alert', role: 'status' }, S.limiting.status === 'bad' ? `Stopped: out of ${S.limiting.name}.` : `${S.limiting.name} runs out first, in about ${hrs(S.limiting.hours)} at full speed.`) : null,
+    supplyNote(st, o, S),
     h('h3', null, 'Inputs'), h('ul', null, rows),
     h('span', { class: 'sup-arrow', 'aria-hidden': 'true' }, '▼'),
-    h('div', { class: 'sup-machine' }, h('span', { class: 'code' }, `${FAMILIES[o.family].code} #${o.id}`), h('span', null, `Makes ${S.out.name}`), h('small', null, `Rated ${S.rate.toFixed(1)} units an hour · recent efficiency ${pct(eff)} · about ${(S.rate * eff).toFixed(1)} an hour now`)),
+    h('div', { class: 'sup-machine' }, h('span', { class: 'code' }, FAMILIES[o.family].code), h('span', null, `${objectLabel(st, o)} makes ${S.out.name}`), h('small', null, `Rated ${S.rate.toFixed(1)} units an hour · recent efficiency ${pct(eff)} · about ${(S.rate * eff).toFixed(1)} an hour now`)),
     h('span', { class: 'sup-arrow', 'aria-hidden': 'true' }, '▼'),
     h('h3', null, 'Output'),
     h('div', { class: 'sup-row' }, h('div', { class: 'sup-head' }, h('span', null, S.out.name), S.out.beltTo.length ? pill('Conveyor', 'info', '⇢') : S.out.toBin ? pill('Conveyor to storage', 'info', '⇢') : S.out.selling ? pill('Selling', 'ok', '$') : pill('Kept for our machines', 'mute')),
-      h('div', { class: 'sup-meta' }, h('strong', null, num(Math.floor(S.out.units))), ` units in the warehouse (${num(S.out.boxes)} boxes). Warehouse space left: ${num(Math.max(0, G.freeBoxes(st)))} boxes.`),
-      S.out.beltTo.length ? h('div', { class: 'sup-meta' }, `Sent by conveyor to machine ${S.out.beltTo.map(t => '#' + t.id).join(', ')}.`) : null));
+      h('div', { class: 'sup-meta' }, h('strong', null, num(Math.floor(S.out.units))), ` units in storage (${num(S.out.boxes)} boxes). Storage space left: ${num(Math.max(0, G.freeBoxes(st)))} boxes.`),
+      S.out.beltTo.length ? h('div', { class: 'sup-meta' }, `Sent by conveyor to ${S.out.beltTo.map(t => objectLabel(st, t)).join(', ')}.`) : null));
 }
 
 function checklist(st) {
@@ -509,16 +556,17 @@ function checklist(st) {
   const steps = [
     [m.length > 0, 'Place a production machine', 'catalog'],
     [safe, 'Paint a safety zone (or lay a belt) on each machine input', 'floor'],
-    [st.employees.some(e => hasRole(e, 'operator')), `Hire a ${jobFor('operator').title}`, 'hire'],
+    [st.employees.some(e => hasRole(e, 'operator')), `Hire ${aOrAn(jobFor('operator').title)}`, 'hire'],
     [m.length && m.every(o => o.operator != null), 'Give every machine an operator', 'staff'],
-    [Object.keys(st.inventory).length > 0 || st.orders.length > 0, 'Order materials', 'purchasing'],
+    // ticked once something is in stock or on order, and unticked while a machine is out of materials with nothing coming
+    [(Object.keys(st.inventory).length > 0 || st.orders.length > 0) && !stalledMachines(st).some(s => s.kind === 'starved'), 'Order materials', 'purchasing'],
     [st.ledger.produced > 0 || st.history.length > 0, 'Start the clock (Play or space bar)', null],
-    [st.employees.some(e => hasRole(e, 'sales')), `Hire an ${jobFor('sales').title} and give them a desk`, 'hire'],
+    [st.employees.some(e => hasRole(e, 'sales')), `Hire ${aOrAn(jobFor('sales').title)} and give them a desk`, 'hire'],
     [!!st.flags.firstDollar, 'Make your first sale', 'sales'],
   ];
   const done = steps.filter(s => s[0]).length;
   return h('section', { class: 'card stack', 'aria-labelledby': 'cl-h' }, h('h2', { id: 'cl-h', tabindex: -1 }, 'Getting started'), h('p', { class: 'muted' }, `${done} of ${steps.length} done`),
-    h('ol', { style: { margin: 0, paddingLeft: '1.3em', display: 'grid', gap: '4px' } }, steps.map(([ok, text, view]) => h('li', null, h('span', { class: ok ? 'good' : '' }, ok ? '✓ ' : '', text), ok ? h('span', { class: 'sr-only' }, ' (done)') : view ? [' ', h('button', { class: 'link', type: 'button', onclick: () => go(view) }, 'Go')] : null))));
+    h('ol', { style: { margin: 0, paddingLeft: '1.3em', display: 'grid', gap: '4px' } }, steps.map(([ok, text, view]) => { const t = h('span', { class: ok ? 'good' : '' }, ok ? '✓ ' : '', text); return h('li', null, t, ok ? h('span', { class: 'sr-only' }, ' (done)') : view ? [' ', nameBy(h('button', { class: 'link', type: 'button', onclick: () => go(view) }, 'Go'), t)] : null); })));
 }
 
 function equipmentTable(st, v) {
@@ -536,6 +584,7 @@ function equipmentTable(st, v) {
 export function mounted() { cancelAnimationFrame(raf); const loop = () => { if (app.view !== 'floor' || !canvas?.isConnected) return; draw(); raf = requestAnimationFrame(loop); }; raf = requestAnimationFrame(loop); }
 export function patch() {
   // light refresh: inspector + checklist only; canvas animates itself
+  updateNeeds();
   const ae = document.activeElement; if (ae && document.getElementById('inspector')?.contains(ae)) return;
   updateInspector();
 }
@@ -546,7 +595,9 @@ function readColors() {
   colorsAt = performance.now();
 }
 let lo = null;
-function draw() {
+// draw times of the last 120 frames, read by the performance test through the test hook
+function draw() { const t0 = performance.now(); drawFrame(); belt.drawMs.push(performance.now() - t0); if (belt.drawMs.length > 120) belt.drawMs.shift(); }
+function drawFrame() {
   const st = app.st; if (!st?.floor || !curView) return;
   if (!colors || performance.now() - colorsAt > 1500) readColors();
   const v = vs(), fl = st.floor, view = curView;
@@ -585,7 +636,7 @@ function draw() {
   c.drawImage(lo, 0, 0, canvas.width, canvas.height);
 }
 // a building crew in hard hats around whatever is being installed at the new site
-const crew = [101, 102, 103, 104].map((id, i) => ({ id, job: [14, 13, 5, 14][i], hat: true, px: null, py: null, tx: null, ty: null }));
+const crew = [101, 102, 103, 104].map((id, i) => ({ id, job: ['line_worker', 'mechanic', 'supervisor', 'line_worker'][i], hat: true, px: null, py: null, tx: null, ty: null }));
 function crewSprites(st, anim) {
   const mv = st.move, n = mv.order.length, p = G.moveProgress(st);
   const i = Math.floor(Math.max(0, (p - 0.08) / 0.86) * n);

@@ -5,9 +5,12 @@ Run through this before tagging a release or merging a large content change.
 | Check | How |
 |---|---|
 | Content scan passes | `npm run scan`. Any entry in `tools/ip_allowlist.json` is a real-world term with a one-line reason. |
+| Scan warnings | The scan prints 3 warnings for the number 1996 in `test/fixtures/save-v1.json`. They are applicant resume years in an old save (play starts in 1998), a calendar year with no other meaning. Any new warning needs a look. |
 | Generated data is current | `npm run build` regenerates `src/gen/data.js` from `data/world.json`, and `git diff src/gen/data.js` shows no change. Never edit it by hand. |
 | Build succeeds | `npm run build` writes `dist/overhead.html`. |
 | Simulation tests pass | `npm run test:node`, including the 24-month balance test (`docs/design/balance.md`). |
+| Old saves load | `node test/saves.mjs` (part of `test:node`). A format change bumps `VERSION` and adds a fixture. |
+| Performance budget | `node test/perf.mjs` (sim tick under 4 ms) and `python3 test/perf_ui_test.py` (floor frame under 16 ms). |
 | Browser tests pass | `npm run test:ui`. The axe-core audits must report zero violations. |
 | Docs are up to date | `docs/design/` reflects any change to the world, economy or balance, and `data/SOURCES.md` lists every outside data source. |
 | Screenshots | If the look changed, rerun `python3 test/readme_shots.py`. |
