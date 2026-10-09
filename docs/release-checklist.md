@@ -5,6 +5,7 @@ Run through this before tagging a release or merging a large content change.
 | Check | How |
 |---|---|
 | Content scan passes | `npm run scan`. Any entry in `tools/ip_allowlist.json` is a real-world term with a one-line reason. |
+| Scan warnings | The scan prints 3 warnings for the number 1996 in `test/fixtures/save-v1.json`. They are applicant resume years in an old save (play starts in 1998), a calendar year with no other meaning. Any new warning needs a look. |
 | Generated data is current | `npm run build` regenerates `src/gen/data.js` from `data/world.json`, and `git diff src/gen/data.js` shows no change. Never edit it by hand. |
 | Build succeeds | `npm run build` writes `dist/overhead.html`. |
 | Simulation tests pass | `npm run test:node`, including the 24-month balance test (`docs/design/balance.md`). |
