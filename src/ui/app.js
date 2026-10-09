@@ -1,5 +1,5 @@
 // App shell: status bar, navigation, the run loop, refresh with focus preservation.
-import { h, announce, prefs, dialog, confirmBox } from './dom.js';
+import { h, frag, announce, prefs, dialog, confirmBox } from './dom.js';
 import * as G from '../sim/game.js';
 import { fmtDate, fmtTime, money, moneyShort, minuteOfDay, isWorkday, MIN_PER_DAY, monthKey, weekday } from '../core/util.js';
 import { WORK_START, WORK_END, isWhite } from '../sim/people.js';
@@ -93,14 +93,14 @@ function statusBar() {
   const bar = h('header', { class: 'status', 'aria-label': 'Company status' },
     h('div', { class: 'brand' }, h('span', { class: 'stripe', 'aria-hidden': 'true' }), st ? st.setup.company : 'Overhead'));
   if (!st) return bar;
-  bar.append(
+  bar.append(frag(
     h('div', { class: 'clock', id: 'st-clock', 'aria-label': 'Game date and time' }, clockText()),
     h('div', { class: 'figs' },
       h('div', { class: 'fig' }, h('span', null, 'Checking'), h('span', { id: 'st-cash' }, money(st.bank.checking))),
       h('div', { class: 'fig' }, h('span', null, 'Net worth'), h('span', { id: 'st-nw' }, moneyShort(G.netWorth(st)))),
       st.city ? h('div', { class: 'fig' }, h('span', null, 'City'), h('span', null, st.city.name)) : null),
     inGame() ? runControls() : null,
-    h('span', { id: 'st-alert' }));
+    h('span', { id: 'st-alert' })));
   return bar;
 }
 function clockText() {

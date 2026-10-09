@@ -25,7 +25,7 @@ export function render() {
     h('p', { class: 'kicker' }, 'A 90s-style factory management sim'),
     h('h1', null, 'Overhead'),
     h('div', { class: 'hazard-rule', 'aria-hidden': 'true' }),
-    h('p', null, `Choose one of ${CITIES.length} American cities and lease a plant. Turn resin, steel and copper wire into motors, circuit boards and housings, then into lamps, toasters, tents, toys and fax machines. Hire a crew with real personalities, keep the machines fed, and outsell the firms across town.`),
+    h('p', null, `Choose one of ${CITIES.length} American cities and lease a plant. Turn resin, steel and magnet wire into motors, control boards and housings, then into lamps, toasters, tents, toys and cash registers. Hire a crew with real personalities, keep the machines fed, and outsell the firms across town.`),
     h('p', { class: 'muted' }, 'Every screen works with a keyboard and a screen reader, and the clock only moves when you start it.'),
     h('div', { class: 'row' },
       saves?.auto ? h('button', { class: 'primary', type: 'button', onclick: () => loadSlot('auto') }, `Continue ${saves.auto.company}`) : null,

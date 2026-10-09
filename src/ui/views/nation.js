@@ -39,7 +39,7 @@ export function render() {
     infoCard(v.sel, playing)));
   const rows = CITIES.map(c => ({ ...c, ...cityStats(c.id) }));
   wrap.append(h('section', { class: 'card' }, h('h2', null, 'Compare cities'),
-    table('All fifty cities', [
+    table(`All ${CITIES.length} cities`, [
       { key: 'name', label: 'City' },
       { key: 'metro', label: 'Metro population', num: true, render: r => num(r.metro) },
       { key: 'avgRent', label: 'Rent / sq ft', num: true, render: r => '$' + r.avgRent.toFixed(2) },

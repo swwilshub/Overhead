@@ -3,7 +3,7 @@
 //   2. Hatches: move the door, the input hatches (one per material) and the output hatch around the outside of the wall.
 //   3. Furnish: place the required items (included in the price), then duplicates and extras, and confirm.
 // Keyboard and mouse do the same things; every step is announced.
-import { h, announce, describe, confirmBox, pill } from '../dom.js';
+import { h, frag, announce, describe, confirmBox, pill } from '../dom.js';
 import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
@@ -251,7 +251,7 @@ export function cellMetrics(a, d, operators, crewText = null) {
   const wrap = h('div', { class: 'stack cell-metrics', role: 'group', 'aria-label': 'Cell performance' }, h('h3', null, 'Performance'));
   if (!a.ok) { wrap.append(h('ul', { class: 'cell-problems' }, a.problems.slice(0, 5).map(p => h('li', null, p)))); return wrap; }
   const rate = d.recipe != null ? unitsPerHour(d.recipe) : null;
-  wrap.append(
+  wrap.append(frag(
     h('p', null, h('strong', null, `Speed ${(a.speedMult * 100).toFixed(0)}%`), ` of a standard ${FAMILIES[d.family].name.toLowerCase()} machine${crewText ? ` with ${crewText}` : ` with ${operators} operator${operators > 1 ? 's' : ''}`}.`, rate ? ` About ${(rate * a.speedMult).toFixed(1)} units an hour at full speed.` : ''),
     h('p', { class: 'muted' }, `Held back by ${LIMIT[a.limit]}. Walk per part: ${a.D.toFixed(0)} squares. ${a.opsUseful > operators ? `Up to ${a.opsUseful} operators can help in this layout.` : 'More operators would not help this layout.'}`),
     h('dl', { class: 'metric-rows' }, METRICS.map(m => {
@@ -259,6 +259,6 @@ export function cellMetrics(a, d, operators, crewText = null) {
       return [h('dt', null, m.name), h('dd', null, h('span', { class: 'num' }, txt), h('span', { class: 'mbar', role: 'meter', 'aria-label': m.name, 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': Math.round(Math.max(0, Math.min(1, frac)) * 100), 'aria-valuetext': `${txt}. ${m.desc}` }, h('i', { style: { width: Math.max(0, Math.min(1, frac)) * 100 + '%' } })))];
     })),
     a.half.length ? h('p', { class: 'muted' }, `Only working at half strength (not next to what they serve): ${[...new Set(a.half.map(it => itemDef(it.t).name))].join(', ')}.`) : null,
-    a.crowd > 0 ? h('p', { class: 'muted' }, 'The cell is crowded, which lowers Safety and slows people down.') : null);
+    a.crowd > 0 ? h('p', { class: 'muted' }, 'The cell is crowded, which lowers Safety and slows people down.') : null));
   return wrap;
 }

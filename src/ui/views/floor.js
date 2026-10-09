@@ -1,4 +1,4 @@
-import { h, table, kv, announce, describe, confirmBox, pill, meter, field } from '../dom.js';
+import { h, frag, table, kv, announce, describe, confirmBox, pill, meter, field } from '../dom.js';
 import { app, go, render as rerender, act, reducedMotion, setupProblems } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
@@ -198,7 +198,7 @@ export function selectObj(o) {
 }
 
 // ---------- inspector
-function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(inspector(st, v)); }
+function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(frag(inspector(st, v))); }
 function inspector(st, v) {
   const o = v.sel ? st.floor.objects.find(o => o.id === v.sel) : null;
   if (!o) return [checklist(st), h('section', { class: 'card' }, h('h2', { tabindex: -1 }, 'Cursor'), h('p', null, `Column ${v.cx + 1}, row ${v.cy + 1}: ${describeTile(st, v.cx, v.cy)}`))];
