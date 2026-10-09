@@ -139,20 +139,23 @@ async def main():
         ok('on the factory floor too' in kb and 'g then m opens the City map' in kb, 'Options keyboard table explains the floor keys')
         await pg.click('#o-keys'); await pg.wait_for_timeout(150)
 
-        # ---- criterion 2: Hiring, three ads in a row without leaving the table
+        # ---- criterion 2: Hiring, three adverts by keyboard: Place ad, the focus stays on the tab, arrows move to the next kind of job
         await nav(pg, 'hire')
         ads0 = await st(pg, 'st.ads.length')
-        await pg.focus('[data-key^="ad-"]')
-        for i in range(3):
+        await pg.focus('[data-key="hire-tab-operations"]')
+        for i, fam in enumerate(['operations', 'maintenance', 'engineering']):
+            if i: await pg.keyboard.press('ArrowRight'); await pg.wait_for_timeout(150)
+            await pg.keyboard.press('Tab'); await pg.wait_for_timeout(100)
             before = await active(pg)
             await pg.keyboard.press('Enter'); await pg.wait_for_timeout(350)
             a = await active(pg)
-            ok(not a['body'] and (a['key'] or '').startswith('ad-') and a['key'] != before['key'], f'ad {i + 1}: focus moves to the next row\'s ad ({before["row"]} -> {a["row"]})')
+            ok(before['key'] == 'ad-' + fam and not a['body'] and a['key'] == 'hire-tab-' + fam, f'ad {i + 1}: Enter on Place ad ({before["key"]}) leaves focus on the tab ({a["key"]})')
         ok(await st(pg, 'st.ads.length') == ads0 + 3, 'three ads placed')
         names = await button_names(pg)
         ok(not dupes(names), f'Hiring: no duplicate button names {dupes(names)}')
-        title = await st(pg, "O.jobFor('maintenance').title")
-        ok(any(re.fullmatch(r'Place ad \(\$\d+\), ' + re.escape(title), x) for x in names), f'ad button named "Place ad ($…), {title}"')
+        await pg.click('[data-key="hire-tab-purchasing"]'); await pg.wait_for_timeout(150)
+        names = await button_names(pg)
+        ok(any(re.fullmatch(r'Place ad \(\$\d+\) for Purchasing, runs 7 days', x) for x in names), f'ad button named "Place ad ($300) for Purchasing, runs 7 days": {[x for x in names if "Place" in x]}')
         await axe(pg, 'Hiring')
 
         # ---- Purchasing: Suggest targets, Purchase all (and its announcement), then live redraws (criterion 3)

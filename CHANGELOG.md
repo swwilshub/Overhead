@@ -4,6 +4,19 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- Seniority. Every kind of job now has three levels: Junior, Senior and Director (Junior Operator, Senior Operator,
+  Operations Director, and so on for Maintenance, Engineering, Finance, Sales, Promotions and Purchasing). People start
+  where they were hired and learn on the job, so a Junior who works a machine, a desk or an office climbs to Senior in
+  about six months and to Director in about two years. Each promotion raises their skill and their pay, and the city's
+  pay scale keeps its place: a Senior costs about half as much again as a Junior. A Director leads: the Operations
+  Director is the floor foreman and the Finance, Sales, Promotions and Purchasing Directors lead their departments. Old
+  saves are converted when you load them.
+- Hiring is one page. Large tabs pick the kind of job, a line with three dots shows its three levels with the city's pay
+  and how many you have, and one **Place ad** button ($300) brings in applicants of every level for a week. Resumes name
+  the level they are applying at.
+- Staff are profile cards. One card at a time shows a person's title, a line with three dots filled to their level and
+  part-way to the next, pay against the city, skill, morale, stress, where they work and what they are doing. Previous
+  and Next buttons, the arrow keys and a swipe move between cards, and tabs narrow them by department.
 - Phone layout, part 4: every page fits. Tables become lists of cards, each value labelled with its column, with a Sort
   by menu in place of the column headers (screen readers still hear a table). The Nation page shows the map full width
   above the city card and you pick a city from the list. The Catalog's tabs are one row you can swipe. On touch

@@ -33,9 +33,10 @@ press **Place here** to put something down. Tables become cards, and nothing scr
    die-casting, coil winding, board assembly, machining, and cut-and-sew. Seven make finished goods: lighting,
    furniture, small appliances, outdoor gear, toys, home electronics and office machines. Each machine needs clear
    input squares, an output square, an operator's post and a service hatch. Paint safety zones on hand-fed inputs.
-4. **Hire people.** Machine Operators run machines. A Floor Supervisor speeds up the floor and a Plant Mechanic keeps
-   it running. Office staff (Bookkeepers, Materials Buyers, Sales Reps, Marketers) each need a desk. Everyone has 31 traits that decide
-   how well they fit a job.
+4. **Hire people.** Pick a kind of job on the Hiring page and place one advert; Juniors, Seniors and sometimes a Director
+   apply. Operators run machines, an Operations Director speeds up the floor and a Mechanic keeps it running. Office staff
+   (finance, sales, promotions, purchasing) each need a desk. Everyone has 31 traits that decide how well they fit a job,
+   and every post has three levels: people learn on the job and are promoted from Junior to Senior to Director.
 5. **Buy and sell.** Materials arrive at your shipping dock and go into storage. Finished goods ship at 3 pm on
    weekdays. Prices move with supply and demand, and your own sales move them too.
 6. **Grow.** Belt machines together so components flow straight into product lines. Add pallet jacks and forklifts,
@@ -86,7 +87,7 @@ Useful extras:
 
 | Path | What |
 |---|---|
-| `data/world.json` | The whole game world: production lines, 106 items and 82 recipes, 42 cities, 14 jobs, 31 traits, offices, events, scenarios and economy constants |
+| `data/world.json` | The whole game world: production lines, 106 items and 82 recipes, 42 cities, 22 jobs (seven three-level ladders and the Plant Director), 31 traits, offices, events, scenarios and economy constants |
 | `tools/gen_world.mjs` | Validates the world, prices every made item from its recipe, and writes `src/gen/data.js` |
 | `src/sim/` | The simulation: city markets and AI firms, the floor and its placement rules, belts and material flow, people and schedules, money and the bank, production cells, office suites, relocation, monthly events |
 | `src/ui/` | The interface: views, the top-down pixel-art renderer, accessible charts, synthesized sound, local saves |

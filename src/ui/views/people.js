@@ -1,10 +1,10 @@
-import { h, table, kv, announce, dialog, confirmBox, pill, meter, field } from '../dom.js';
+import { h, table, kv, announce, dialog, confirmBox, pill, meter, field, tabs, ladderDots, levelLine, carousel } from '../dom.js';
 import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
-import { JOBS, JOB_LIST, deptName, hasRole, ATTR_GROUPS, ATTRS, NEGATIVE_ATTRS } from '../../core/content.js';
+import { JOBS, JOB_LIST, AD_TARGETS, ladder, LEVEL_NAME, levelOf, deptName, hasRole, ATTR_GROUPS, ATTRS, NEGATIVE_ATTRS } from '../../core/content.js';
 import { ECONOMY } from '../../gen/data.js';
 const RAISE = () => Math.round(ECONOMY.walkoutRaise * 100);
-import { fullName, skill, payRatio, marketSalary, jobFit, activityAt, ACT_LABEL, isWhite } from '../../sim/people.js';
+import { fullName, skill, payRatio, marketSalary, jobFit, activityAt, ACT_LABEL, isWhite, levelProgress } from '../../sim/people.js';
 import { objectLabel } from '../../sim/floor.js';
 import { money, num, pct, fmtDate, fmtShortDate, minuteOfDay, MIN_PER_DAY } from '../../core/util.js';
 
@@ -13,39 +13,47 @@ const moodPill = v => v >= 65 ? pill(`${Math.round(v)} good`, 'ok') : v >= 40 ? 
 const stressPill = v => v >= 80 ? pill(`${Math.round(v)} severe`, 'bad') : v >= 50 ? pill(`${Math.round(v)} high`, 'warn') : pill(`${Math.round(v)} ok`, 'ok');
 
 // ================= Staff
+// where the person is, "Senior, 64% of the way to Director", and so on: the words the three-dot line stands for
+const levelText = e => { const l = levelOf(e); return !l ? 'Plant Director, runs the plant' : l >= 3 ? 'Director, top of the ladder' : `${LEVEL_NAME[l]}, ${Math.round(levelProgress(e) * 100)}% of the way to ${LEVEL_NAME[l + 1]}`; };
+const workplace = (st, e) => e.assign ? objectLabel(st, st.floor.objects.find(o => o.id === e.assign) || { kind: '?' }) : 'No post yet';
+const DEPT_ORDER = [...new Set(AD_TARGETS.map(t => t.dept))];
+
 export const staff = {
   live: true,
   render() {
-    const st = app.st, vs = (app.viewState.staff ||= { sort: { key: 'dept', dir: 1 } });
-    const rows = st.employees.map(e => ({ e, name: fullName(e), title: JOBS[e.job].title, dept: JOBS[e.job].dept, salary: e.salary, ratio: payRatio(st, e), fit: skill(e), morale: e.morale, stress: e.stress, where: e.assign ? objectLabel(st, st.floor.objects.find(o => o.id === e.assign) || { kind: '?' }) : '—' }));
+    const st = app.st, v = (app.viewState.staff ||= { dept: 'all', car: {} });
+    const present = DEPT_ORDER.filter(d => st.employees.some(e => JOBS[e.job].dept === d));
+    if (v.dept !== 'all' && !present.includes(v.dept)) v.dept = 'all';
+    const people = st.employees.filter(e => v.dept === 'all' || JOBS[e.job].dept === v.dept)
+      .sort((a, b) => DEPT_ORDER.indexOf(JOBS[a.job].dept) - DEPT_ORDER.indexOf(JOBS[b.job].dept) || levelOf(b) - levelOf(a) || fullName(a).localeCompare(fullName(b)));
     const payroll = st.employees.reduce((s, e) => s + e.salary, 0);
-    return h('div', { class: 'stack' },
+    const label = d => { const n = st.employees.filter(e => d === 'all' || JOBS[e.job].dept === d).length; return `${d === 'all' ? 'All' : deptName(d)} (${n})`; };
+    return h('div', { class: 'stack staff-page' },
       h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Staff'), h('p', null, `${num(st.employees.length)} employees · payroll ${money(payroll)} a year, paid every other Friday.`)), h('button', { type: 'button', class: 'primary', onclick: () => go('hire') }, 'Hire people')),
       st.strike ? h('div', { class: 'notice', role: 'alert' }, h('p', null, h('strong', null, 'The floor crew has walked out. '), `They want a ${RAISE()}% raise, and no machine runs until it's settled.`), h('button', { type: 'button', class: 'primary', style: { marginTop: '8px' }, onclick: async () => { if (await confirmBox('End the walkout?', `Give everyone on the floor a ${RAISE()}% raise?`, 'Give the raise')) act(G.settleStrike(st)); } }, `Give the ${RAISE()}% raise`)) : null,
       deptSummary(st),
-      h('section', { class: 'card' }, h('h2', null, 'Employees'),
-        table('Employees', [
-          { key: 'name', label: 'Name', render: r => h('button', { class: 'link', type: 'button', 'data-key': 'emp-' + r.e.id, onclick: () => profile(r.e.id) }, r.name) },
-          { key: 'title', label: 'Job' }, { key: 'dept', label: 'Department', render: r => deptName(r.dept) },
-          { key: 'where', label: 'Workplace' },
-          { key: 'status', label: 'Now', render: r => statusOf(st, r.e), sortable: false },
-          { key: 'salary', label: 'Salary', num: true, render: r => money(r.salary) },
-          { key: 'ratio', label: 'vs city avg', num: true, render: r => h('span', { class: r.ratio < 0.92 ? 'bad' : r.ratio > 1.08 ? 'good' : '' }, pct(r.ratio)) },
-          { key: 'fit', label: 'Skill', num: true, render: r => pct(r.fit) },
-          { key: 'morale', label: 'Morale', render: r => moodPill(r.morale) },
-          { key: 'stress', label: 'Stress', render: r => stressPill(r.stress) }],
-        rows, { sortState: vs.sort, onSort: s => { vs.sort = s; rerender({}); }, empty: 'No employees yet. Place a help-wanted ad on the Hiring page.' })));
+      st.employees.length ? tabs('Department', ['all', ...present].map(d => [d, label(d)]), v.dept, k => { v.dept = k; rerender({}); }, 'staff-panel', 'staff-tab') : null,
+      h('div', { id: 'staff-panel', role: st.employees.length ? 'tabpanel' : null, 'aria-labelledby': st.employees.length ? 'staff-tab-' + v.dept : null },
+        carousel(people, e => profileCard(st, e), { state: v.car, key: e => e.id, name: 'Staff', label: e => `${fullName(e)}, ${JOBS[e.job].title}`, empty: 'No employees yet. Place a help-wanted ad on the Hiring page.' })));
   },
 };
+function profileCard(st, e) {
+  const j = JOBS[e.job], ratio = payRatio(st, e), l = levelOf(e);
+  return h('article', { class: 'profile-card', 'aria-label': fullName(e) },
+    h('header', null, h('h2', { class: 'profile-name' }, fullName(e)), h('p', { class: 'profile-title' }, j.title, ' ', h('span', { class: 'muted' }, `· ${deptName(j.dept)}`))),
+    l ? h('div', { class: 'profile-level' }, levelLine(l, levelProgress(e)), h('p', null, levelText(e))) : h('p', { class: 'profile-level muted' }, levelText(e)),
+    h('p', { class: 'profile-pay' }, h('span', { class: 'muted' }, 'Pay '), money(e.salary), ' ', h('span', { class: ratio < 0.92 ? 'bad' : ratio > 1.08 ? 'good' : 'muted' }, `(${pct(ratio)} of city average)`)),
+    h('dl', { class: 'profile-stats' }, [['Skill', pct(skill(e))], ['Morale', moodPill(e.morale)], ['Stress', stressPill(e.stress)]].map(([k, v]) => h('div', null, h('dt', null, k), h('dd', null, v)))),
+    kv([['Works at', workplace(st, e)], ['Now', statusOf(st, e)]]),
+    h('div', { class: 'row' }, h('button', { type: 'button', 'data-key': 'emp-' + e.id, onclick: () => profile(e.id) }, 'Details')));
+}
 function deptSummary(st) {
   const d = st.dept, delay = G.accountingDelay(st);
-  const items = [
-    [deptName('finance'), st.employees.some(e => hasRole(e, 'finance')) ? (delay > 2 ? pill(`${delay} days behind`, 'warn') : pill('Up to date', 'ok')) : pill('No staff: bills paid late', 'bad')],
-    [deptName('supply'), st.employees.some(e => hasRole(e, 'purchasing')) ? pill(`Can place about ${Math.max(1, Math.round(d.purchCap))} orders a day`, 'ok') : pill('No staff: you place every order', 'warn')],
-    ['Sales effort', h('span', null, meter(d.salesEff / 3, 'Sales effort'), ' ', d.salesEff < 0.5 ? 'Walk-in customers only' : d.salesEff < 1.2 ? 'Modest' : 'Strong')],
-    ['Brand awareness', h('span', null, meter(d.awareness, 'Brand awareness'), ' ', pct(d.awareness))],
-  ];
-  return h('section', { class: 'card' }, h('h2', null, 'Departments'), kv(items));
+  return h('section', { class: 'dept-line', 'aria-label': 'Departments' }, h('ul', { class: 'row', tabindex: 0, style: { listStyle: 'none', margin: 0, padding: 0, gap: '6px' } },
+    [[deptName('finance'), st.employees.some(e => hasRole(e, 'finance')) ? (delay > 2 ? pill(`${delay} days behind`, 'warn') : pill('Up to date', 'ok')) : pill('No staff: bills paid late', 'bad')],
+      [deptName('supply'), st.employees.some(e => hasRole(e, 'purchasing')) ? pill(`About ${Math.max(1, Math.round(d.purchCap))} orders a day`, 'ok') : pill('No staff: you place every order', 'warn')],
+      ['Sales', pill(d.salesEff < 0.5 ? 'Walk-ins only' : d.salesEff < 1.2 ? 'Modest effort' : 'Strong effort', d.salesEff < 0.5 ? 'warn' : 'ok')],
+      ['Brand', pill(pct(d.awareness), 'info')]].map(([k, p]) => h('li', null, h('span', { class: 'muted' }, k + ' '), p))));
 }
 
 export async function profile(empId) {
@@ -55,7 +63,7 @@ export async function profile(empId) {
   const raise = h('select', { id: 'rev-raise' }, [0, 2, 3, 5, 8, 10, 15].map(p => h('option', { value: p }, p ? `${p}% raise (${money(Math.round(e.salary * (1 + p / 100) / 100) * 100)})` : 'No raise')));
   const fits = JOB_LIST.map(j => ({ j, f: jobFit(e.attrs, j.key) })).sort((a, b) => b.f - a.f).slice(0, 3);
   const body = h('div', { class: 'stack' },
-    kv([['Job', `${JOBS[e.job].title}, ${deptName(JOBS[e.job].dept)}`], ['Age', `${e.age}`], ['Hired', fmtDate(e.hired)], ['Salary', `${money(e.salary)} (city average for this job ${money(marketSalary(st, e.job))})`], ['Skill at this job', pct(skill(e))], ['Morale', Math.round(e.morale) + ' / 100'], ['Stress', Math.round(e.stress) + ' / 100'], ['Last review', fmtShortDate(e.lastReview)], ['Best suited for', fits.map(x => `${x.j.title} (${pct(x.f)})`).join(', ')]]),
+    kv([['Job', `${JOBS[e.job].title}, ${deptName(JOBS[e.job].dept)}`], ['Level', levelText(e)], ['Age', `${e.age}`], ['Hired', fmtDate(e.hired)], ['Salary', `${money(e.salary)} (city average for this job ${money(marketSalary(st, e.job))})`], ['Skill at this job', pct(skill(e))], ['Morale', Math.round(e.morale) + ' / 100'], ['Stress', Math.round(e.stress) + ' / 100'], ['Last review', fmtShortDate(e.lastReview)], ['Best suited for', fits.map(x => `${x.j.title} (${pct(x.f)})`).join(', ')]]),
     traits,
     h('div', { class: 'row', style: { alignItems: 'end' } }, field('Performance review', raise, 'People like reviews that come with a raise.'), h('button', { type: 'button', onclick: () => { act(G.review(st, e.id, +raise.value), false, +raise.value ? 'cash' : 'ok'); } }, 'Give review')));
   const r = await dialog(`${fullName(e)}`, body, [{ label: 'Terminate…', value: 'fire', danger: true }, { label: 'Close', value: null, primary: true }], { wide: true });
@@ -63,27 +71,34 @@ export async function profile(empId) {
 }
 
 // ================= Hiring
+const AD_DAYS = 7;
 export const hire = {
   live: true,
   render() {
-    const st = app.st;
+    const st = app.st, v = (app.viewState.hire ||= { family: AD_TARGETS[0].key });
     const resumes = st.memos.filter(m => m.kind === 'resume' && !m.data.hired && !m.data.gone);
+    const familyOf = m => JOBS[m.data.cand.job].family || 'director';
+    const cur = AD_TARGETS.find(t => t.key === v.family) || AD_TARGETS[0];
+    const here = resumes.filter(m => familyOf(m) === cur.key);
+    const rungs = cur.key === 'director' ? [JOBS.director] : ladder(cur.key);
+    const ad = st.ads.find(a => a.family === cur.key && a.until > st.time);
+    const cost = cur.key === 'director' ? ECONOMY.seniority.directorAdCost : ECONOMY.seniority.adCost;
+    const label = t => { const n = resumes.filter(m => familyOf(m) === t.key).length; return n ? `${t.name} (${n})` : t.name; };
     return h('div', { class: 'stack' },
-      h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Hiring'), h('p', null, 'Place a help-wanted ad. Resumes arrive in the In-basket over the next week; make an offer to hire.'))),
-      h('section', { class: 'card' }, h('h2', null, `Resumes on file (${resumes.length})`), resumeTable(st, resumes)),
-      h('section', { class: 'card' }, h('h2', null, 'Help-wanted ads'),
-        table('Job titles', [
-          { key: 'title', label: 'Job' },
-          { key: 'dept', label: 'Department', render: j => deptName(j.dept) },
-          { key: 'collar', label: 'Works in', render: j => j.collar === 'white' ? 'Office' : 'Factory floor' },
-          { key: 'pay', label: 'City average pay', num: true, render: j => money(marketSalary(st, j.key)), sort: j => j.pay },
-          { key: 'have', label: 'On staff', num: true, render: j => num(st.employees.filter(e => e.job === j.key).length), sort: j => st.employees.filter(e => e.job === j.key).length },
-          { key: 'desc', label: 'Duties', render: j => j.desc, sortable: false },
-          { key: 'ad', label: 'Ad', sortable: false, render: j => { const ad = st.ads.find(a => a.job === j.key && a.until > st.time); return ad ? pill(`Running until ${fmtShortDate(ad.until)}`, 'info') : h('button', { type: 'button', 'data-key': 'ad-' + j.key, onclick: () => act(G.placeAd(st, j.key), false, 'order') }, `Place ad (${money(j.lead ? 550 : 300)})`); } }],
-        JOB_LIST, { hideCaption: true })));
+      h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Hiring'), h('p', null, 'Choose a kind of job and place one advert. Over the next week, Juniors, Seniors and sometimes a Director apply; make an offer to hire.'))),
+      tabs('Kind of job', AD_TARGETS.map(t => [t.key, label(t)]), cur.key, k => { v.family = k; rerender({}); }, 'hire-panel', 'hire-tab'),
+      h('div', { id: 'hire-panel', role: 'tabpanel', 'aria-labelledby': 'hire-tab-' + cur.key, class: 'stack' },
+        h('section', { class: 'card stack' },
+          h('h2', null, cur.name),
+          h('p', null, rungs[0].desc),
+          cur.key === 'director' ? null : ladderDots(rungs.map(j => j.title), 0, { label: `${cur.name} levels`, extra: i => h('span', { class: 'rung-info num' }, h('span', null, money(marketSalary(st, rungs[i - 1].key)), h('span', { class: 'sr-only' }, ' city pay')), h('span', null, `${num(st.employees.filter(e => e.job === rungs[i - 1].key).length)} on staff`)) }),
+          cur.key === 'director' ? h('p', { class: 'muted num' }, `${money(marketSalary(st, 'director'))} city pay · ${num(st.employees.filter(e => e.job === 'director').length)} on staff`) : null,
+          ad ? h('p', null, pill(`Ad running until ${fmtShortDate(ad.until)}`, 'info'))
+            : h('div', { class: 'row' }, h('button', { type: 'button', class: 'primary', 'data-key': 'ad-' + cur.key, onclick: () => { act(G.placeAd(st, cur.key), false, 'order'); document.getElementById('hire-tab-' + cur.key)?.focus(); } }, `Place ad (${money(cost)})`, h('span', { class: 'sr-only' }, ` for ${cur.name}, runs ${AD_DAYS} days`)))),
+        h('section', { class: 'card' }, h('h2', null, `Resumes on file (${here.length})`), resumeTable(st, here, cur.name))));
   },
 };
-function resumeTable(st, resumes) {
+function resumeTable(st, resumes, what = '') {
   return table('Resumes', [
     { key: 'name', label: 'Applicant', render: m => h('button', { class: 'link', type: 'button', 'data-key': 'res-' + m.id, onclick: () => openResume(m.id) }, `${m.data.cand.first} ${m.data.cand.last}`) },
     { key: 'job', label: 'Position', render: m => JOBS[m.data.cand.job].title, sort: m => JOBS[m.data.cand.job].id },
@@ -92,7 +107,7 @@ function resumeTable(st, resumes) {
     { key: 'yrs', label: 'Experience', num: true, render: m => `${m.data.cand.years} yr`, sort: m => m.data.cand.years },
     { key: 'exp', label: 'Expires', render: m => fmtShortDate(m.data.expires), sortable: false },
     { key: 'go', label: '', sortable: false, render: m => h('button', { type: 'button', 'data-key': 'offer-' + m.id, onclick: () => openResume(m.id) }, 'Review and offer') }],
-    resumes, { hideCaption: true, empty: 'No resumes waiting. Place an ad below.', defaultSort: 'fit', defaultDir: -1 });
+    resumes, { hideCaption: true, empty: `No ${what.toLowerCase()} resumes waiting. Place an ad above.`, defaultSort: 'fit', defaultDir: -1 });
 }
 
 export async function openResume(memoId) {

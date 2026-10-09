@@ -73,21 +73,24 @@ async def main():
             await no_junk_text(pg, f'{v} view')
         # clearer names: Hiring and Staff tables, the checklist, the In-basket and the memo sender use the new words
         await pg.click('nav.rail a[href="#hire"]'); await pg.wait_for_timeout(300)
-        jobs = await pg.locator('table:has(th:has-text("Duties")) tbody tr > :first-child').all_inner_texts()
-        want = ['Plant Director', 'Finance Manager', 'Bookkeeper', 'Finance Clerk', 'Sales Manager', 'Sales Rep', 'Marketer', 'Purchasing Manager', 'Materials Buyer', 'Floor Supervisor', 'Machine Operator', 'Chief Engineer', 'Research Engineer', 'Plant Mechanic']
+        jobs = []
+        for t in await pg.locator('[role=tab]').all_inner_texts():
+            await pg.click(f'[role=tab]:text-is("{t}")'); await pg.wait_for_timeout(120)
+            got = await pg.locator('.ladder .rung').all_inner_texts()
+            jobs += got if got else [t]
+        want = ['Plant Director', 'Finance Clerk', 'Bookkeeper', 'Finance Director', 'Junior Sales Rep', 'Senior Sales Rep', 'Sales Director', 'Junior Promoter', 'Senior Promoter', 'Promotions Director', 'Junior Buyer', 'Senior Buyer', 'Purchasing Director', 'Operations Director', 'Junior Operator', 'Senior Operator', 'Junior Engineer', 'Senior Engineer', 'Engineering Director', 'Junior Mechanic', 'Senior Mechanic', 'Maintenance Director']
         ok(sorted(j.strip() for j in jobs) == sorted(want), f'Hiring lists the new job titles: {jobs}')
-        depts = set(await pg.locator('table:has(th:has-text("Duties")) tbody tr td:nth-child(2)').all_inner_texts())
-        ok({'Management', 'Sales', 'Purchasing', 'Finance', 'Production', 'Engineering'} <= {d.strip() for d in depts}, f'Hiring shows the new department names: {depts}')
         await old_names_gone(pg, 'Hiring'); await axe_check(pg, 'Hiring with new names')
         await pg.click('nav.rail a[href="#staff"]'); await pg.wait_for_timeout(300)
         staff = await pg.locator('#main').inner_text()
-        ok('Machine Operator' in staff and 'Sales Rep' in staff and 'Purchasing' in staff, 'Staff page: ' + ' '.join(staff.split())[:140])
+        depts = [d.strip() for d in await pg.locator('[role=tab]').all_inner_texts()]
+        ok(any(d.startswith('Production') for d in depts) and any(d.startswith('Sales') for d in depts) and ('Junior Operator' in staff or 'Junior Sales Rep' in staff), f'Staff page: tabs {depts}, card: ' + ' '.join(staff.split())[:140])
         await old_names_gone(pg, 'Staff'); await axe_check(pg, 'Staff with new names')
         await pg.click('nav.rail a[href="#inbox"]'); await pg.wait_for_timeout(300)
         await old_names_gone(pg, 'In-basket')
         await pg.click('nav.rail a[href="#floor"]'); await pg.wait_for_timeout(300)
         cl = await pg.locator('#inspector').inner_text()
-        ok('Hire a Machine Operator' in cl and 'Hire a Sales Rep and give them a desk' in cl, 'checklist uses the job titles: ' + ' '.join(cl.split())[:200])
+        ok('Hire a Junior Operator' in cl and 'Hire a Junior Sales Rep and give them a desk' in cl, 'checklist uses the job titles: ' + ' '.join(cl.split())[:200])
         eq = await pg.locator('table:has(th:has-text("Status / occupant"))').inner_text()
         ok(re.search(r'machine #\d+', eq) and 'Machine #' not in eq, 'equipment table uses one machine label: ' + ' '.join(eq.split())[:120])
         await old_names_gone(pg, 'Factory floor')

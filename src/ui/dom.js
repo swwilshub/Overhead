@@ -6,7 +6,7 @@ export function h(tag, attrs, ...kids) {
   if (attrs) for (const [k, v] of Object.entries(attrs)) {
     if (v == null || v === false) continue;
     if (k === 'class') el.className = v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'style' && typeof v === 'object') { for (const [p, x] of Object.entries(v)) { if (p.startsWith('--')) el.style.setProperty(p, x); else el.style[p] = x; } }
     else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
     else if (k === 'html') el.innerHTML = v;
     else if (k in el && typeof v !== 'string' && k !== 'list') el[k] = v;
@@ -215,4 +215,69 @@ export function field(label, input, hint) {
   const id = input.id || ('f' + Math.random().toString(36).slice(2, 8)); input.id = id;
   const hid = hint ? id + '-hint' : null; if (hid) input.setAttribute('aria-describedby', hid);
   return h('div', { class: 'field' }, h('label', { for: id }, label), input, hint ? h('span', { id: hid, class: 'muted', style: { fontSize: '0.85rem' } }, hint) : null);
+}
+
+// ---- large tabs: a tablist with arrow keys, Home and End. `list` is [[key, label], ...]; `pick(key)` re-renders and the
+// helper puts focus back on the chosen tab. Styled as .cat-tabs, which turns into a swipeable strip on a phone.
+export function tabs(label, list, cur, pick, panelId, prefix = 'tab') {
+  const go = k => { pick(k); document.getElementById(`${prefix}-${k}`)?.focus(); };
+  return h('div', { class: 'cat-tabs', role: 'tablist', 'aria-label': label },
+    list.map(([k, text]) => h('button', { type: 'button', role: 'tab', id: `${prefix}-${k}`, 'aria-selected': String(cur === k), 'aria-controls': panelId, tabindex: cur === k ? 0 : -1, 'data-key': `${prefix}-${k}`,
+      onclick: () => go(k),
+      onkeydown: e => {
+        const i = list.findIndex(c => c[0] === cur), d = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 1, ArrowUp: -1 }[e.key];
+        if (d) { e.preventDefault(); go(list[(i + d + list.length) % list.length][0]); }
+        else if (e.key === 'Home') { e.preventDefault(); go(list[0][0]); }
+        else if (e.key === 'End') { e.preventDefault(); go(list[list.length - 1][0]); }
+      } }, text)));
+}
+
+// ---- a seniority line: one dot per rung, filled up to `level`, with the rung's name under it. A named list, so the dots
+// are never the only way to read the level.
+export function ladderDots(names, level, opts = {}) {
+  return h('ol', { class: 'ladder', 'aria-label': opts.label || 'Seniority' },
+    names.map((n, i) => h('li', { class: i + 1 <= level ? 'on' : '', 'aria-current': i + 1 === level ? 'step' : null },
+      h('span', { class: 'dot', 'aria-hidden': 'true' }), h('span', { class: 'rung' }, n), opts.extra ? opts.extra(i + 1) : null)));
+}
+
+// ---- a progress line for seniority: three dots on a line, filled up to the current level and part-way to the next.
+// Purely visual (aria-hidden); the level and progress are always written out beside it.
+export function levelLine(level, progress = 0) {
+  const at = Math.min(2, Math.max(0, level - 1 + (level >= 3 ? 0 : progress))) / 2 * 100;
+  return h('div', { class: 'levelline', 'aria-hidden': 'true', style: { '--p': at + '%' } },
+    [1, 2, 3].map(n => h('span', { class: n <= level ? 'pt on' : 'pt', style: { left: (n - 1) * 50 + '%' } })));
+}
+
+// ---- a carousel: one card at a time, with Previous and Next buttons, a count, swipe and the arrow keys.
+//   items            what to page through
+//   render(item, i)  builds the card
+//   opts.state       an object kept by the caller ({ id, i }) so the place survives a re-render
+//   opts.key(item)   a stable id for an item, so the place follows the person, not the position
+//   opts.label(item) text announced when the card changes, e.g. "Maria Lopez, Senior Operator"
+//   opts.name        the region's label, e.g. "Staff"
+export function carousel(items, render, opts = {}) {
+  const s = opts.state || {}, n = items.length, key = opts.key || (x => x);
+  let i = s.id != null ? items.findIndex(x => key(x) === s.id) : -1;
+  if (i < 0) i = Math.min(s.i || 0, Math.max(0, n - 1));
+  const card = h('div', { class: 'carousel-card', 'aria-live': 'off' });
+  const count = h('span', { class: 'carousel-count num', 'aria-hidden': 'true' });
+  const prev = h('button', { type: 'button', class: 'carousel-btn', 'data-key': 'car-prev', onclick: () => move(-1) }, h('span', { 'aria-hidden': 'true' }, '‹ '), 'Previous');
+  const next = h('button', { type: 'button', class: 'carousel-btn', 'data-key': 'car-next', onclick: () => move(1) }, 'Next', h('span', { 'aria-hidden': 'true' }, ' ›'));
+  const show = said => {
+    s.i = i; s.id = n ? key(items[i]) : null;
+    card.replaceChildren(n ? render(items[i], i) : h('p', { class: 'empty' }, opts.empty || 'Nothing to show.'));
+    count.textContent = n ? `${i + 1} of ${n}` : '';
+    prev.disabled = next.disabled = n < 2;
+    if (said && n) announce(`${i + 1} of ${n}: ${opts.label ? opts.label(items[i]) : ''}`, 'polite', false);
+  };
+  function move(d) { if (n < 2) return; i = (i + d + n) % n; show(true); }
+  // swipe: a mostly horizontal drag of 50 px or more; vertical drags still scroll the page
+  let sx = null, sy = 0;
+  card.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') return; sx = e.clientX; sy = e.clientY; });
+  card.addEventListener('pointerup', e => { if (sx == null) return; const dx = e.clientX - sx, dy = e.clientY - sy; sx = null; if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5) move(dx < 0 ? 1 : -1); });
+  card.addEventListener('pointercancel', () => { sx = null; });
+  show(false);
+  return h('section', { class: 'carousel', role: 'region', 'aria-roledescription': 'carousel', 'aria-label': opts.name || 'Items', tabindex: n ? 0 : null,
+    onkeydown: e => { if (e.target !== e.currentTarget && !e.target.matches?.('.carousel-btn')) return; const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (d) { e.preventDefault(); move(d); } } },
+    card, h('div', { class: 'carousel-bar' }, prev, count, next));
 }
