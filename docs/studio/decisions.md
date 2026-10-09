@@ -45,3 +45,18 @@ Newest first. Each entry: date, decision, reason.
 - **2026-10-08 — The performance budget and old-save checks are scripts.** `test/perf.mjs`, `test/perf_ui_test.py` and
   `test/saves.mjs` with fixtures in `test/fixtures/`. Reason: QA must measure, not guess, and every branch must prove
   old saves still load.
+
+- **2026-10-09 — Work moves back into the main session.** Sam found spawning many agents inefficient, and a rate limit
+  stopped four of them mid-review. The producer builds and fixes in the main session; agents are for independent QA and
+  content review only. Reason: Sam's call; it also keeps timing tests honest, since fewer things run at once.
+- **2026-10-09 — A stall is told once, quietly.** A starved or blocked machine gets one Plant log memo after 30 working
+  minutes, grouped by hour, at most three a day, and only urgent when nothing is running. Reason: the playtest found
+  machines stopping with no warning (P1-1, P4-1), and a notice per machine per hour would bury the In-basket.
+- **2026-10-09 — "Out of materials" changes what the player is told, not the economy.** Idle machines keep the old
+  wear and accident rules. Reason: an early build relabelled them and the 24-month run went over its one-month growth
+  limit; spec 003 says no economy numbers change.
+- **2026-10-09 — The credit dialog stops the clock.** The amount shown must be the amount borrowed. Reason: QA measured
+  a $74,000 drift after 5 seconds at top speed. If the amount still changes, buying says so.
+- **2026-10-09 — Needs attention refreshes in place and never takes focus.** If focus is on one of its buttons, the
+  refresh waits. Reason: pillar 4 and spec 004; a list that redraws under a keyboard user is worse than a stale one.
+
