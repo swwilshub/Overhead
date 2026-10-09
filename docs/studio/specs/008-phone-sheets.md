@@ -20,14 +20,17 @@ messages do not hide what I am doing.
 
 1. **Dialogs are bottom sheets.** In compact mode every dialog is anchored to the bottom, full width, with rounded top
    corners, at most 85% of the screen high (it scrolls inside if longer), clear of the home-bar area. Its buttons are
-   full width, at least 48 px high, one per row, the main action first. Wide dialogs (the Catalog's cell designer
-   is not one) use the same rule.
+   full width, at least 48 px high, one per row, in the same order as on a desktop (so Tab order matches what is
+   seen). Wide dialogs use the same rule.
 2. **The selected item's panel is a sheet.** On the Factory floor in compact mode, selecting something opens its panel
-   as a sheet above the bottom bar, at most 55% of the screen high, scrolling inside. The floor above stays tappable.
-   **Close** (a 44 px button) or tapping an empty square clears the selection and closes it. With nothing selected
-   the panel (Getting started, Cursor) is not shown as a sheet but is under the floor as today.
+   as a sheet above the bottom bar. It starts collapsed (the item's name, its status, and the buttons **Details** and
+   **Close**, under about 220 px) so the plant stays in view; **Details** opens the rest, up to 55% of the screen high,
+   scrolling inside. The floor above stays tappable. **Close** (a 44 px button), Escape, or tapping an empty square
+   clears the selection and closes it. With nothing selected the panel (Getting started, Cursor) is not a sheet but is
+   under the floor as today.
 3. **Focus rules hold.** Opening the sheet from a tap does not steal focus from the floor grid; closing returns focus
-   to the grid. The keyboard `i` key still moves focus into the panel, and Escape clears the selection and closes it.
+   to the grid. The keyboard `i` key opens the details and moves focus into the panel, and Escape clears the selection
+   and closes it.
 4. **Toasts stay clear.** In compact mode toasts show at the top under the top bar, at most two at a time, and do not
    take taps.
 5. **Desktop is unchanged.** At 1280 × 800 dialogs, the panel and toasts look as they do today.
@@ -44,9 +47,11 @@ Dragging a sheet to resize or dismiss it, a sheet for the Catalog's machine list
 
 - **Dialogs** stay native `dialog` elements (modal, labelled, Escape closes); only their placement and button layout
   change.
-- **The panel sheet** keeps its headings and region labels; "Close" is a real button named "Close panel".
+- **The panel sheet** keeps its headings and region labels; "Close" is a real button named "Close panel", and
+  "Details" has `aria-expanded`. Collapsed, the hidden parts are removed from the page, not just covered.
+- **The floor page** keeps its address and storage line for screen readers on a phone; it is only hidden from sight.
 - **Screen readers:** selecting announces as it does now; opening the sheet adds no extra announcement.
-- **Reduced motion:** no slide animation when it is on; a short fade otherwise.
+- **Reduced motion:** the sheets do not animate at all.
 
 ## Balance knobs
 

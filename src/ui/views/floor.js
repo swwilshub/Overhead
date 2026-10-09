@@ -1,5 +1,5 @@
 import { h, frag, table, kv, announce, describe, confirmBox, pill, meter, field, nameBy } from '../dom.js';
-import { app, go, render as rerender, act, reducedMotion, setupProblems, shortcutsOn, navPending } from '../app.js';
+import { app, go, render as rerender, act, reducedMotion, setupProblems, shortcutsOn, navPending, isCompact } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
 import { JOBS, hasRole, canRunMachine, jobFor, deptColor, DEPT_LIST, aOrAn } from '../../core/content.js';
@@ -58,12 +58,12 @@ export function render() {
   const siteTabs = st.move ? h('div', { class: 'site-tabs', role: 'tablist', 'aria-label': 'Which building' },
     [['old', `Current plant · ${st.city.lots[st.lotId].addr}`], ['new', `New site · ${st.city.lots[st.move.lotId].addr} · ${Math.round(G.moveProgress(st) * 100)}% built`]].map(([k, label]) =>
       h('button', { type: 'button', role: 'tab', 'aria-selected': String((v.site || 'old') === k), 'data-key': 'site-' + k, onclick: () => { v.site = k; v.sel = null; followId = null; rerender({}); document.getElementById('floor-app')?.focus(); announce(k === 'new' ? 'Showing the new site under construction.' : 'Showing the current plant.', 'polite', false); } }, label))) : null;
-  return h('div', { class: 'stack' },
+  return h('div', { class: 'stack floor-page' },
     h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Factory floor'), h('p', null, `${st.city.lots[st.lotId].addr} · ${num(st.city.lots[st.lotId].sqft)} sq ft · storage ${num(G.boxesStored(st))} of ${num(storageCapacity(fl))} boxes`))),
     h('div', { id: 'needs-wrap', 'data-sig': needsSig(fixes) }, needsAttention(st, fixes)),
     h('div', { class: 'floor-layout' },
       h('div', { class: 'stack', style: { minWidth: 0 } }, siteTabs, newSite ? null : tools, appEl, help, legend()),
-      h('aside', { class: 'stack', 'aria-label': editing() ? 'Cell blueprint' : newSite ? 'Construction' : 'Inspector', id: 'inspector' }, newSite ? movePanel(st) : editing() ? editorPanel(st) : inspector(st, v))),
+      h('aside', { class: 'stack' + (asSheet(v, newSite) ? ' sheet' : '') + (v.sheetOpen ? ' open' : ''), 'aria-label': editing() ? 'Cell blueprint' : newSite ? 'Construction' : 'Inspector', id: 'inspector' }, newSite ? movePanel(st) : editing() ? editorPanel(st) : inspector(st, v))),
     equipmentTable(st, v));
 }
 function movePanel(st) {
@@ -115,7 +115,7 @@ function wireCanvas(el, st, v, view) {
     if (e.key === 'r' || e.key === 'R') { e.preventDefault(); v.rot = (v.rot + 1) % 4; announce(`Rotated to ${v.rot * 90} degrees.`, 'polite', false); speakCursor(st, v); return; }
     if ((e.key === 'm' || e.key === 'M') && v.sel) { e.preventDefault(); beginMove(st, v); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && v.sel) { e.preventDefault(); sellSelected(st, v); return; }
-    if (e.key === 'i' || e.key === 'I') { e.preventDefault(); document.querySelector('#inspector h2')?.focus(); }
+    if (e.key === 'i' || e.key === 'I') { e.preventDefault(); if (v.sel && isCompact() && !v.sheetOpen) { v.sheetOpen = true; updateInspector(); } document.querySelector('#inspector h2')?.focus(); }
   });
 }
 let curView = null;
@@ -235,11 +235,21 @@ function updateNeeds() {
   if (wrap.contains(document.activeElement)) return;
   wrap.dataset.sig = sig; wrap.replaceChildren(...[needsAttention(st, fixes)].filter(Boolean));
 }
-function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(frag(inspector(st, v))); }
+// On a phone the panel for the selected item is a sheet over the bottom of the screen (spec 008), so it is seen where the
+// player tapped; with nothing selected it stays under the floor as the checklist and Cursor card.
+const asSheet = (v, newSite) => isCompact() && !!v.sel && !editing() && !newSite;
+let sheetFor = null; // the selection the sheet was last opened for: a new selection starts collapsed
+function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (v.sel !== sheetFor) { sheetFor = v.sel; v.sheetOpen = false; } if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(frag(inspector(st, v))); el.classList.toggle('sheet', asSheet(v, st.move && v.site === 'new')); el.classList.toggle('open', !!v.sheetOpen); }
+// Collapsed, the sheet shows the item's name and status and leaves the plant in view; Details opens the rest.
+function sheetActions(v) {
+  return h('div', { class: 'sheet-actions' },
+    h('button', { type: 'button', class: 'sheet-more', 'data-key': 'sheet-more', 'aria-expanded': String(!!v.sheetOpen), 'aria-controls': 'inspector', onclick: () => { v.sheetOpen = !v.sheetOpen; updateInspector(); announce(v.sheetOpen ? 'Details shown.' : 'Details hidden.', 'polite', false); document.querySelector('[data-key="sheet-more"]')?.focus(); } }, v.sheetOpen ? 'Less' : 'Details'),
+    h('button', { type: 'button', class: 'sheet-close', 'data-key': 'sheet-close', 'aria-label': 'Close panel', onclick: () => { v.sel = null; updateInspector(); announce('Selection cleared.', 'polite', false); document.getElementById('floor-app')?.focus(); } }, 'Close'));
+}
 function inspector(st, v) {
   const o = v.sel ? st.floor.objects.find(o => o.id === v.sel) : null;
   if (!o) return [checklist(st), h('section', { class: 'card' }, h('h2', { tabindex: -1 }, 'Cursor'), h('p', null, `Column ${v.cx + 1}, row ${v.cy + 1}: ${describeTile(st, v.cx, v.cy)}`))];
-  const card = h('section', { class: 'card stack', 'aria-labelledby': 'insp-h' }, h('h2', { id: 'insp-h', tabindex: -1 }, objectLabel(st, o)));
+  const card = h('section', { class: 'card stack', 'aria-labelledby': 'insp-h' }, h('h2', { id: 'insp-h', tabindex: -1 }, objectLabel(st, o)), isCompact() ? sheetActions(v) : null);
   if (o.kind === 'machine') machineInspector(st, o, card);
   else if (o.kind === 'cell') cellInspector(st, o, card);
   else if (o.kind === 'suite') suiteInspector(st, o, card);

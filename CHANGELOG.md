@@ -4,6 +4,9 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- Phone layout, part 2. Questions pop up as a sheet at the bottom of the screen with big full-width buttons. Tapping a
+  machine opens a short sheet with its name and status, with Details for the rest and Close to dismiss it, so the plant
+  stays in view. Messages now show under the top bar instead of over the bottom bar.
 - Phone layout, part 1. On a phone the top bar is slim (company, money, the clock and four big speed buttons), a
   bottom bar has Floor, Staff, In-basket and Menu, and Menu opens a sheet with every section, net worth, city, Run
   until… and Sound. In landscape the bars shrink to leave room for the plant. Nothing on a phone scrolls sideways any
