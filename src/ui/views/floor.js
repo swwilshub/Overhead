@@ -4,6 +4,7 @@ import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
 import { JOBS, hasRole, canRunMachine, jobFor, deptColor, DEPT_LIST, aOrAn } from '../../core/content.js';
 import { KINDS, ZONE, ZONE_INFO, OFFICES, footprint, ports, rotSize, placementProblem, zoneProblem, describeTile, objectAt, objectLabel, links, beltSummary, inputPorts, portItem, portName, isProducer, storageCapacity, priceOf, inBounds, center, countKind, BOXES_PER_STORAGE_TILE } from '../../sim/floor.js';
+import { stalledMachines, alsoLacking, alsoText } from '../../sim/stalls.js';
 import { unitsPerHour } from '../../sim/world.js';
 import { fullName, skill, activityAt, ACT_LABEL, isWhite } from '../../sim/people.js';
 import { money, num, pct, minuteOfDay, fmtShortDate, fmtDate } from '../../core/util.js';
@@ -57,7 +58,7 @@ export function render() {
       h('button', { type: 'button', role: 'tab', 'aria-selected': String((v.site || 'old') === k), 'data-key': 'site-' + k, onclick: () => { v.site = k; v.sel = null; followId = null; rerender({}); document.getElementById('floor-app')?.focus(); announce(k === 'new' ? 'Showing the new site under construction.' : 'Showing the current plant.', 'polite', false); } }, label))) : null;
   return h('div', { class: 'stack' },
     h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Factory floor'), h('p', null, `${st.city.lots[st.lotId].addr} · ${num(st.city.lots[st.lotId].sqft)} sq ft · storage ${num(G.boxesStored(st))} of ${num(storageCapacity(fl))} boxes`))),
-    fixes.length ? h('div', { class: 'notice', role: 'region', 'aria-label': 'Setup issues' }, h('strong', null, 'Needs attention: '), h('ul', { style: { margin: '4px 0 0', paddingLeft: '1.2em' } }, fixes.map(f => h('li', null, f.text, ' ', h('button', { class: 'link', type: 'button', onclick: () => { if (f.obj) { const o = fl.objects.find(o => o.id === f.obj); selectObj(o); } else go(f.view); } }, f.obj ? 'Show me' : 'Fix'))))) : null,
+    h('div', { id: 'needs-wrap', 'data-sig': needsSig(fixes) }, needsAttention(st, fixes)),
     h('div', { class: 'floor-layout' },
       h('div', { class: 'stack', style: { minWidth: 0 } }, siteTabs, newSite ? null : tools, appEl, help, legend()),
       h('aside', { class: 'stack', 'aria-label': editing() ? 'Cell blueprint' : newSite ? 'Construction' : 'Inspector', id: 'inspector' }, newSite ? movePanel(st) : editing() ? editorPanel(st) : inspector(st, v))),
@@ -131,6 +132,7 @@ function speakCursor(st, v) {
     if (v.mode === 'place' || v.mode === 'move') { const p = ghostProblem(st, v); msg += p ? ` Cannot place: ${p}` : ' Placement OK.'; }
     if (v.mode === 'zone') { const p = zoneProblem(st.floor, v.cx, v.cy, v.zone); if (p) msg += ' ' + p; }
     describe(msg);
+    if (!v.sel) updateInspector(); // the Cursor card says what the announcement says, even with the clock stopped
   }, 140);
 }
 function ghostSpec(v) {
@@ -198,6 +200,20 @@ export function selectObj(o) {
 }
 
 // ---------- inspector
+// The list of things that need the owner, in its own container so a light refresh can swap it without a redraw.
+function needsAttention(st, fixes) {
+  const fl = st.floor;
+  return fixes.length ? h('div', { class: 'notice', role: 'region', 'aria-label': 'Setup issues' }, h('strong', null, 'Needs attention: '), h('ul', { style: { margin: '4px 0 0', paddingLeft: '1.2em' } }, fixes.map(f => h('li', null, f.text, ' ', h('button', { class: 'link', type: 'button', onclick: () => { if (f.obj) { const o = fl.objects.find(o => o.id === f.obj); selectObj(o); } else go(f.view); } }, f.obj ? 'Show me' : 'Fix'))))) : null;
+}
+const needsSig = fixes => fixes.map(f => f.text + '|' + (f.obj ?? f.view)).join('\n');
+function updateNeeds() {
+  const wrap = document.getElementById('needs-wrap'), st = app.st; if (!wrap || !st?.floor || st.move) return;
+  const fixes = setupProblems(st), sig = needsSig(fixes);
+  if (sig === wrap.dataset.sig) return;
+  // never take focus from the list: if the player is on one of its buttons, try again on the next refresh
+  if (wrap.contains(document.activeElement)) return;
+  wrap.dataset.sig = sig; wrap.replaceChildren(...[needsAttention(st, fixes)].filter(Boolean));
+}
 function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(frag(inspector(st, v))); }
 function inspector(st, v) {
   const o = v.sel ? st.floor.objects.find(o => o.id === v.sel) : null;
@@ -453,6 +469,12 @@ function tripPose(st, o, t) {
 
 // ---------- stock levels for one machine
 const COVER_SCALE = 16; // hours shown on the bar: two full shifts
+// One status pill says what the machine is doing; this line adds a different problem or a warning, never a second "Stopped".
+function supplyNote(st, o, S) {
+  const l = S.limiting; if (!l || l.status === 'ok') return null;
+  if (l.status === 'bad') { const also = alsoLacking(st, o); return also.length ? h('p', { class: 'sup-alert', role: 'status' }, `Also: ${alsoText(also)}.`) : null; }
+  return h('p', { class: 'sup-alert', role: 'status' }, `${l.name} runs out first, in about ${hrs(l.hours)} at full speed.`);
+}
 export function machineSupply(st, o) {
   const r = RECIPES[o.recipe], fl = st.floor, L = links(fl);
   const rate = unitsPerHour(o.recipe);
@@ -491,7 +513,7 @@ function supplyGraphic(st, o) {
     i.onOrder ? h('div', { class: 'sup-meta' }, `+ ${num(i.onOrder)} boxes on order, first arriving ${fmtDate(i.nextEta)}.`) : (!i.belt && i.status !== 'ok' ? h('div', { class: 'sup-meta' }, 'Nothing on order. ', h('button', { class: 'link', type: 'button', onclick: () => buyDialog(i.id) }, `Buy ${i.name}`)) : null)));
   const eff = o.effAvg;
   return h('div', { class: 'supply', role: 'group', 'aria-label': 'Stock levels for this machine' },
-    S.limiting && S.limiting.status !== 'ok' ? h('p', { class: 'sup-alert', role: 'status' }, S.limiting.status === 'bad' ? `Stopped: out of ${S.limiting.name}.` : `${S.limiting.name} runs out first, in about ${hrs(S.limiting.hours)} at full speed.`) : null,
+    supplyNote(st, o, S),
     h('h3', null, 'Inputs'), h('ul', null, rows),
     h('span', { class: 'sup-arrow', 'aria-hidden': 'true' }, '▼'),
     h('div', { class: 'sup-machine' }, h('span', { class: 'code' }, FAMILIES[o.family].code), h('span', null, `${objectLabel(st, o)} makes ${S.out.name}`), h('small', null, `Rated ${S.rate.toFixed(1)} units an hour · recent efficiency ${pct(eff)} · about ${(S.rate * eff).toFixed(1)} an hour now`)),
@@ -511,7 +533,8 @@ function checklist(st) {
     [safe, 'Paint a safety zone (or lay a belt) on each machine input', 'floor'],
     [st.employees.some(e => hasRole(e, 'operator')), `Hire ${aOrAn(jobFor('operator').title)}`, 'hire'],
     [m.length && m.every(o => o.operator != null), 'Give every machine an operator', 'staff'],
-    [Object.keys(st.inventory).length > 0 || st.orders.length > 0, 'Order materials', 'purchasing'],
+    // ticked once something is in stock or on order, and unticked while a machine is out of materials with nothing coming
+    [(Object.keys(st.inventory).length > 0 || st.orders.length > 0) && !stalledMachines(st).some(s => s.kind === 'starved'), 'Order materials', 'purchasing'],
     [st.ledger.produced > 0 || st.history.length > 0, 'Start the clock (Play or space bar)', null],
     [st.employees.some(e => hasRole(e, 'sales')), `Hire ${aOrAn(jobFor('sales').title)} and give them a desk`, 'hire'],
     [!!st.flags.firstDollar, 'Make your first sale', 'sales'],
@@ -536,6 +559,7 @@ function equipmentTable(st, v) {
 export function mounted() { cancelAnimationFrame(raf); const loop = () => { if (app.view !== 'floor' || !canvas?.isConnected) return; draw(); raf = requestAnimationFrame(loop); }; raf = requestAnimationFrame(loop); }
 export function patch() {
   // light refresh: inspector + checklist only; canvas animates itself
+  updateNeeds();
   const ae = document.activeElement; if (ae && document.getElementById('inspector')?.contains(ae)) return;
   updateInspector();
 }

@@ -1,6 +1,6 @@
 # 003 — Stalled machines are visible
 
-Backlog Sprint 1 · Pillars 1, 4 · Effort M · Save impact: none
+Backlog Sprint 1 · Pillars 1, 4 · Effort M · Save impact: none · Status: built, awaiting review
 
 ## Problem
 

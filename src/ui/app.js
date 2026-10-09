@@ -5,6 +5,7 @@ import { fmtDate, fmtTime, money, moneyShort, minuteOfDay, isWorkday, MIN_PER_DA
 import { WORK_START, WORK_END, isWhite } from '../sim/people.js';
 import { hasRole } from '../core/content.js';
 import { ports, links, ZONE, objectLabel } from '../sim/floor.js';
+import { stalledMachines } from '../sim/stalls.js';
 import { saveGame, localPrefsGet, localPrefsSet, submitScore } from './storage.js';
 import { sfx, sfxBatch, ambience } from './sound.js';
 
@@ -140,7 +141,7 @@ function updateStatus() {
   const al = document.getElementById('st-alert');
   if (al) {
     const n = setupProblems(st).length;
-    const want = n ? `${n} setup issue${n > 1 ? 's' : ''}` : '';
+    const want = n ? `${n} issue${n > 1 ? 's' : ''}` : '';
     if (al.dataset.v !== want) { al.dataset.v = want; al.replaceChildren(n ? h('button', { class: 'alert', type: 'button', onclick: () => go('floor') }, want) : ''); }
   }
   updateNavBadges();
@@ -162,6 +163,8 @@ export function setupProblems(st) {
     const un = G.unsafeInputs(fl, o);
     if (un.length) { out.push({ text: `${objectLabel(st, o)} needs a safety zone (or a belt) at input ${un.map(u => u.k + 1).join(' and ')}.`, view: 'floor', obj: o.id }); }
   }
+  // machines that are starved or blocked right now, each with its reason (a delivery on its way is not a problem)
+  for (const s of stalledMachines(st)) out.push({ text: `${objectLabel(st, s.obj)}: ${s.short}.`, view: 'floor', obj: s.obj.id, stall: s.kind });
   if (links(fl).dangling) out.push({ text: 'Some conveyor belts do not connect to anything.', view: 'floor' });
   if (st.employees.some(e => isWhite(e) && !fl.objects.some(o => (o.kind === 'office' || o.kind === 'suite') && o.id === e.assign))) out.push({ text: 'An office worker has no office.', view: 'catalog' });
   return out;

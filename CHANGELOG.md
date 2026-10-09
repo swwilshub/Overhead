@@ -4,6 +4,17 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- You are told when a machine stops. A machine with nothing left to work on reads **Out of materials** (stock that is
+  still on its way reads "Waiting for materials"), and one whose output has nowhere to go reads "Output blocked". After
+  30 minutes of working time the Plant log sends one memo with the reason and what to do, at most three a day. Needs
+  attention on the floor lists every stopped machine with a Show me button, updates by itself without moving your
+  place, and the status bar counts them ("3 issues").
+- The floor cursor reads a machine's state, for example "Column 6, row 5: Die-casting line machine #5, out of
+  materials: Zinc ingot", and the Cursor card shows the same words even while the clock is stopped. The machine panel
+  shows one status; any other problem reads "Also: out of ...".
+- Assigning or removing an operator updates the machine's status at once, and a staffed machine reads **Plant closed**
+  outside working hours. "Order materials" in Getting started unticks while a machine is out of materials with nothing
+  on order. Quick start no longer sends the "building is bare" memo, and its own memo is true when it arrives.
 - Clearer names for staff. The people you hire now have titles that say what they do: Line Worker is **Machine
   Operator**, Account Rep is **Sales Rep**, Promotions Specialist is **Marketer**, Buyer is **Materials Buyer**, Office
   Assistant is **Finance Clerk**, Shift Supervisor is **Floor Supervisor** and Development Engineer is **Research

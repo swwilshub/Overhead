@@ -50,7 +50,8 @@ const OLD = ['Line Worker', 'Account Rep', 'Promotions Specialist', 'Office Assi
   'Shift Supervisor', 'Development Engineer', 'Front office', 'Machine shop', 'Furniture shop', 'Plant manager', 'Hand cart', 'Input empty',
   'needs an engineer', 'researcher away', 'Hire a researcher', 'Hire an operator', 'Storage (pallets)', 'stored pallets', 'walk-in buyers',
   'Accounting falls', 'researcher-hours'];
-for (const old of OLD) { const hits = find(new RegExp(old.replace(/[()]/g, '\\$&'), 'i')); ok(!hits.length, `no "${old}" in src/ or data/${hits.length ? ': ' + hits.slice(0, 3).join(' | ') : ''}`); }
+// STALE_STATUS in game.js keeps the old status words on purpose, so a save made before the rename is brought up to date
+for (const old of OLD) { const hits = find(new RegExp(old.replace(/[()]/g, '\\$&'), 'i')).filter(l => !/STALE_STATUS/.test(l)); ok(!hits.length, `no "${old}" in src/ or data/${hits.length ? ': ' + hits.slice(0, 3).join(' | ') : ''}`); }
 const buyerTitle = find(/["'`]Buyer["'`]|\bthe Buyer\b|\ba Buyer\b/);
 ok(!buyerTitle.length, `no bare "Buyer" title${buyerTitle.length ? ': ' + buyerTitle.slice(0, 3).join(' | ') : ''}`);
 const deptWords = find(/["'`](Commercial|Supply)["'`]/).filter(l => !/FIRM_SUFFIX = /.test(l)); // "Supply" still ends some company names
@@ -88,7 +89,8 @@ ok(!handMade.length, `no hand-built "Machine #" or "#\${id} input" labels${handM
 const marks = { 'Out of materials': '!', 'Output full: storage full': '!', 'Output blocked: belt full': '!', 'Output tray full': '!',
   'No operator': '?', 'Research: no engineer': '?', 'Research: engineer away': null, 'Operator away': null, 'Waiting for materials': null, Running: null, 'Research 40%': null };
 for (const [s, m] of Object.entries(marks)) ok(statusMark(s) === m, `floor marker for "${s}" is ${m ?? 'none'}`);
-const statuses = find(/'(Out of materials|Research: no engineer|Research: engineer away)'/).filter(l => l.startsWith('src/sim/game.js'));
-ok(statuses.length === 3, `the sim sets the new research and materials statuses (${statuses.length} of 3)`);
+const gameSrc = fs.readFileSync(path.join(root, 'src/sim/game.js'), 'utf8') + fs.readFileSync(path.join(root, 'src/sim/stalls.js'), 'utf8');
+const missing = ['Out of materials', 'Research: no engineer', 'Research: engineer away'].filter(w => !gameSrc.includes(`'${w}'`));
+ok(!missing.length, `the sim sets the new research and materials statuses${missing.length ? ' (missing: ' + missing.join(', ') + ')' : ''}`);
 ok(find(/from: 'Plant log'/).length >= 5 && find(/from: 'Purchasing'/).length === 1, 'memos come from "Plant log" and "Purchasing"');
 done('names');

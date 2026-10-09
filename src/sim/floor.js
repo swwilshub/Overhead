@@ -1,6 +1,7 @@
 // Factory floor: tiles, zones, equipment footprints, access rules, conveyor networks.
 import { FAMILIES, RECIPES, ITEMS, OFFICES as OFFICES_DATA, EQUIPMENT } from '../gen/data.js';
 import { itemDef, itemTiles } from './cells.js';
+import { statusPhrase } from './stalls.js';
 
 export const TILE_SQFT = 64;
 export const ZONE = { NONE: 0, STORAGE: 1, SAFETY: 2, SMOKING: 3, CARPET: 4, FORKLIFT: 5 };
@@ -309,6 +310,7 @@ export function describeTile(st, x, y) {
   const { access } = occupancy(fl); const a = access.get(y * fl.w + x);
   const parts = [];
   if (o) parts.push(objectLabel(st, o));
+  if (o && isProducer(o)) parts.push(statusPhrase(st, o)); // its state, so the cursor says "broken" or "out of materials"
   if (o && isRoom(o)) { const it = (o.items || []).find(i => itemTiles(i).some(([ix, iy]) => o.x + ix === x && o.y + iy === y)); parts.push(it ? itemDef(it.t).name.toLowerCase() : 'cell floor'); }
   if (z) parts.push(ZONE_INFO[z].name);
   if (a && (!o || o.kind === 'conveyor')) parts.push(`${o ? 'on the ' : ''}${a.port === 'door' ? 'doorway of ' : isInputPort(a.port) ? portName(a.obj, +a.port[2]) + ' of ' : PORT_LABEL[a.port] + ' of '}${objectLabel(st, a.obj)}`);

@@ -9,6 +9,7 @@ import { makeCandidate, hire, skill, payRatio, fullName, isWhite, planDay, activ
 import { monthlyEvents, advisorReport } from './events.js';
 import { analyse, cellPrice, itemDef, REQUIRED, MIN_SIZE, MAX_SIZE, TECHS, CELL_ITEMS, techDone } from './cells.js';
 import { analyseSuite, suitePrice, SUITE_REQUIRED, SUITE_MIN, SUITE_MAX } from './suites.js';
+import { STATUS, BOX_GAP, BUF_BOXES, starvedInputs, outputBlock, stallOf, beltStock, staffedBy } from './stalls.js';
 
 export const VERSION = 1;
 export const SCENARIOS = Object.fromEntries(SCENARIO_LIST.map(sc => [sc.key, sc]));
@@ -56,14 +57,15 @@ export function visitCity(st, cityId) {
   st.cityId = cityId; st.city = city; st.phase = 'city';
 }
 
-export function rentBuilding(st, lotId) {
+// quiet: skip the "Getting started" memo (Quick start sets the plant up itself)
+export function rentBuilding(st, lotId, { quiet = false } = {}) {
   const lot = st.city.lots[lotId];
   if (lot.firm != null) return { ok: false, msg: 'That building is occupied.' };
   st.lotId = lotId; st.phase = 'play';
   st.floor = newFloor(lot.sqft);
   st.rent = lot.rent;
   memo(st, { from: 'Leasing office', subject: `Lease signed: ${lot.addr}`, body: `Your lease on ${lot.addr} in ${st.city.name} starts today: ${num(lot.sqft)} sq ft at ${money(lot.rent)} a month, due on the first of each month.` });
-  memo(st, { from: 'Plant log', subject: 'Getting started', important: true, body: `The building is bare. From the Catalog, buy a machine and set it down, paint a safety zone on each input square, and hire ${aTitle('operator')}. Nothing runs until materials arrive, so order those too.` });
+  if (!quiet) memo(st, { from: 'Plant log', subject: 'Getting started', important: true, body: `The building is bare. From the Catalog, buy a machine and set it down, paint a safety zone on each input square, and hire ${aTitle('operator')}. Nothing runs until materials arrive, so order those too.` });
   const bm = bestMarkets(st.city, 3).map(i => ITEMS[i].name);
   if (bm.length) memo(st, { from: 'Market research', subject: 'Where the openings are', body: `Demand runs furthest ahead of supply for: ${bm.join(', ')}. A product made from bought-in parts gets you selling quickly; making your own components later widens the margin.` });
   pay(st, lot.rent, 'rent', `Rent, ${lot.addr} (first month)`);
@@ -207,7 +209,8 @@ export const BELT_PRICE = () => KINDS.conveyor.price;
 // takes it and has room, or into storage through a bin; otherwise it waits, the boxes behind it close up, and once the
 // lane is full the machine's output tray fills and the machine stops. Without a belt, the operator carries boxes:
 // finished goods out to the nearest storage square and materials back in, which takes them away from the machine.
-export const BELT_SPEED = 0.25, BOX_GAP = 0.8, BUF_BOXES = 2;
+export const BELT_SPEED = 0.25;
+export { BOX_GAP, BUF_BOXES };
 export const laneKey = r => `${r.from}>${r.to}:${r.k ?? ''}`;
 const CARRY = { hand: { per: 0.12, cap: 1, load: 0.4 }, cart: { per: 0.09, cap: 2, load: 0.3 }, forklift: { per: 0.05, cap: 4, load: 0.15 } };
 function syncLanes(st, L) {
@@ -497,6 +500,7 @@ export function migrate(st) {
   if ((st.v || 1) > VERSION) throw new Error(`This save comes from a newer version of the game (format ${st.v}).`);
   if (st.floor) st.cellTech = st.cellTech || { done: {}, active: null };
   st.v = VERSION;
+  if (st.floor && st.phase === 'play') refreshOperators(st); // old status words ("Input empty", "Shift over") give way to the current ones
   return st;
 }
 // Input squares in use by the current product that have neither a belt nor a safety zone
@@ -588,6 +592,7 @@ export function setRecipe(st, id, recipeId) {
   const cost = Math.round(FAMILIES[o.family].price * ECONOMY.retoolShare);
   clearLocal(st, o);
   o.recipe = recipeId; o.mode = 'produce'; o.research = null; o.progress = 0;
+  refreshStatus(st, o, true);
   pay(st, cost, 'equipment', `Retooled ${objectLabel(st, o)} for ${ITEMS[RECIPES[recipeId].out].name}`);
   return { ok: true, msg: `Retooled for ${ITEMS[RECIPES[recipeId].out].name} at a cost of ${money(cost)}.` };
 }
@@ -602,6 +607,7 @@ export function startResearch(st, id, recipeId) {
   const rank = locked.findIndex(r => r.id === recipeId);
   const need = Math.round(140 * (1 + rank * 0.35) * (st.city.aiKnown[recipeId] ? 0.55 : 1));
   o.research = { target: recipeId, hours: 0, need };
+  refreshStatus(st, o);
   return { ok: true, msg: `Research on ${ITEMS[RECIPES[recipeId].out].name} started: about ${need} engineer-hours.` };
 }
 
@@ -635,7 +641,74 @@ function refreshOperators(st) {
   for (const o of st.floor.objects) if (isProducer(o)) {
     o.operator = st.employees.find(e => e.assign === o.id)?.id ?? null;
     if (o.kind === 'cell') o.operators = st.employees.filter(e => e.assign === o.id).map(e => e.id);
+    refreshStatus(st, o);
   }
+}
+// ---------------- machine status between ticks
+export const isShift = t => { const m = minuteOfDay(t); return isWorkday(t) && m >= WORK_START && m < WORK_END; };
+const STALE_STATUS = /^(|Idle|No operator|Plant closed|Shift over|Input empty|Research: no engineer)$/;
+// Bring a machine's status up to date without running the clock: when someone is assigned or taken off, when the
+// plant closes, when a game is loaded. A machine that is staffed during the shift keeps what the last tick found,
+// unless that was a stale "nobody here" (or `force` is set, after a retool).
+export function refreshStatus(st, o, force = false) {
+  if (!isProducer(o)) return;
+  if (o.broken) { o.status = 'Broken'; return; }
+  const staffed = staffedBy(st, o);
+  if (o.mode === 'research') {
+    const op = o.operator != null ? st.employees.find(e => e.id === o.operator) : null;
+    if (!o.research) o.status = 'Research: no project';
+    else if (!op || !hasRole(op, 'researcher')) o.status = 'Research: no engineer';
+    else if (!isShift(st.time)) o.status = STATUS.closed;
+    else if (STALE_STATUS.test(o.status || '')) o.status = `Research ${Math.min(99, Math.floor(o.research.hours / o.research.need * 100))}%`;
+    return;
+  }
+  if (o.recipe == null) { o.status = 'Idle'; return; }
+  if (!staffed) { o.status = STATUS.noOperator; o.eff = 0; return; }
+  if (!isShift(st.time)) { o.status = STATUS.closed; return; }
+  if (!force && !STALE_STATUS.test(o.status || '')) return;
+  if (o.kind === 'cell' && !cellAnalysis(o, st.employees.filter(e => e.assign === o.id).length).ok) { o.status = 'Layout incomplete'; return; }
+  const block = outputBlock(st, o), r = RECIPES[o.recipe];
+  o.status = block === 'belt' ? 'Output blocked: belt full' : block === 'storage' ? 'Output full: storage full'
+    : starvedInputs(st, o).length ? 'Out of materials'
+    : r.inputs.every(([it, q]) => (o.inBuf?.[it] || 0) >= q / r.outQty - 1e-9) ? 'Running' : 'Waiting for materials';
+}
+
+// ---------------- stalled machines: a notice for the owner
+// A machine that has been starved or blocked for STALL_NOTICE_MIN shift minutes in a row gets one note from the plant
+// log. A stall ends when the machine makes a unit. The same machine is not noticed again within STALL_REPEAT_MIN,
+// notices that fall due in the same game hour share one memo, and at most STALL_MEMOS_PER_DAY go out in a game day
+// (what is held back goes out the next morning if it is still stuck; Needs attention lists it meanwhile).
+// The memory is not saved: after a load a machine that is still stuck may be noticed once more.
+export const STALL_NOTICE_MIN = 30, STALL_REPEAT_MIN = 1440, STALL_MEMOS_PER_DAY = 3;
+const stallMemory = new WeakMap();
+const stallLine = (st, o, s) => `${objectLabel(st, o)}: ${s.reason}: ${s.fix}.`;
+function trackStalls(st, machines, ran, inShift, t, dt) {
+  let mem = stallMemory.get(st); if (!mem) stallMemory.set(st, mem = { by: new Map(), day: -1, sent: 0, group: null });
+  const belt = beltStock(st), due = [];
+  for (const o of machines) {
+    let s = mem.by.get(o.id);
+    const stall = ran.has(o.id) || o.mode !== 'produce' || !staffedBy(st, o) ? null : stallOf(st, o, belt);
+    if (!stall) { if (s) { s.mins = 0; s.sent = false; } continue; }
+    if (!s) mem.by.set(o.id, s = { mins: 0, sent: false, last: null });
+    if (inShift) s.mins += dt;
+    if (!s.sent && s.mins >= STALL_NOTICE_MIN && (s.last == null || t - s.last >= STALL_REPEAT_MIN)) due.push({ o, s, stall });
+  }
+  if (!due.length) return;
+  const day = dayIndex(t), hour = Math.floor(t / 60), g = mem.group;
+  if (mem.day !== day) { mem.day = day; mem.sent = 0; }
+  const entries = due.map(({ o, stall }) => ({ id: o.id, line: stallLine(st, o, stall) }));
+  const text = es => es.length === 1 ? { subject: `Machine stopped: ${objectLabel(st, machines.find(m => m.id === es[0].id))}`, body: es[0].line } : { subject: `${es.length} machines stopped`, body: es.map(e => '• ' + e.line).join('\n') };
+  if (g && g.hour === hour && st.memos.some(m => m.id === g.memoId)) {
+    // another machine falls due in the hour of the last notice: add it to that memo
+    g.entries.push(...entries);
+    Object.assign(st.memos.find(m => m.id === g.memoId), text(g.entries), { read: false });
+  } else {
+    if (mem.sent >= STALL_MEMOS_PER_DAY) return;
+    const urgent = !ran.size && !machines.some(o => o.mode === 'produce' && /Running/.test(o.status || ''));
+    const m = memo(st, { from: 'Plant log', ...text(entries), important: urgent });
+    mem.sent++; mem.group = { hour, memoId: m.id, entries };
+  }
+  for (const { s } of due) { s.sent = true; s.last = t; }
 }
 export function terminate(st, empId) {
   const i = st.employees.findIndex(e => e.id === empId); if (i < 0) return { ok: false };
@@ -893,7 +966,7 @@ export function accountingDelay(st) {
 
 // ---------------- the working day
 function work(st, t0, dt) {
-  const minute = minuteOfDay(t0);
+  const minute = minuteOfDay(t0), inShift = minute >= WORK_START && minute < WORK_END;
   const fl = st.floor;
   // who is where
   const smokingZ = fl.zones.includes(ZONE.SMOKING);
@@ -914,6 +987,7 @@ function work(st, t0, dt) {
   let maintPower = maint.reduce((s, e) => s + skill(e), 0) * dt / 60;
   techStep(st, dt);
   syncLanes(st, L);
+  const ran = new Set(); let beltMap = null; // machines that made a unit this step; boxes on belts, built when first needed
   const equip = forks * 4 >= machines.length && forks ? 'forklift' : carts * 3 >= machines.length && carts ? 'cart' : forks || carts ? 'cart' : 'hand';
   for (const o of machines) {
     const isCell = o.kind === 'cell';
@@ -929,9 +1003,9 @@ function work(st, t0, dt) {
     if (o.mode === 'research') { researchStep(st, o, op, dt); continue; }
     if (o.recipe == null) { o.status = 'Idle'; continue; }
     if (isCell && !crew.length) { o.status = 'No operator'; o.eff = 0; continue; }
-    if (isCell && !present.length) { o.status = crew.some(e => e.state === 'strike') ? 'Crew on walkout' : 'Crew away'; continue; }
+    if (isCell && !present.length) { o.status = crew.some(e => e.state === 'strike') ? 'Crew on walkout' : inShift ? 'Crew away' : STATUS.closed; continue; }
     if (!op) { o.status = 'No operator'; o.eff = 0; continue; }
-    if (op.act !== 'work') { o.status = op.state === 'strike' ? 'Operator on walkout' : 'Operator away'; continue; }
+    if (op.act !== 'work') { o.status = op.state === 'strike' ? 'Operator on walkout' : inShift ? 'Operator away' : STATUS.closed; continue; }
     const r = RECIPES[o.recipe], pack = ITEMS[r.out].pack;
     const CA = isCell ? cellAnalysis(o, present.length) : null;
     if (CA && !CA.ok) { o.status = 'Layout incomplete'; continue; }
@@ -954,7 +1028,8 @@ function work(st, t0, dt) {
       // inputs come only from what is at the machine: delivered by belt or carried in
       let ok = true;
       for (const [it, q] of r.inputs) if ((o.inBuf[it] || 0) < q * yf / r.outQty - 1e-9) { ok = false; break; }
-      if (!ok) { why = o.trip ? 'Waiting for materials' : r.inputs.some(([it]) => (st.inventory[it] || 0) + (o.inBuf[it] || 0) > 0) ? 'Waiting for materials' : 'Out of materials'; break; }
+      // out of materials means an input has nothing anywhere it can be got from; stock that is still on its way is waiting
+      if (!ok) { why = starvedInputs(st, o, beltMap ||= beltStock(st)).length ? 'Out of materials' : 'Waiting for materials'; break; }
       if (o.tray + 1 > trayMax + 1e-9) { pushOutput(st, o); if (o.tray + 1 > trayMax + 1e-9) { why = o.outLanes ? 'Output blocked: belt full' : freeBoxes(st) <= 0 ? 'Output full: storage full' : 'Output tray full'; break; } }
       for (const [it, q] of r.inputs) {
         o.inBuf[it] -= q * yf / r.outQty; if (o.inBuf[it] <= 1e-9) delete o.inBuf[it];
@@ -969,31 +1044,37 @@ function work(st, t0, dt) {
       pushOutput(st, o);
     }
     o.progress = can >= 1 ? 0 : can;
+    if (made) ran.add(o.id);
     o.status = made ? 'Running' : why || (o.trip && prodMin <= 0 ? (o.trip.out ? 'Carrying boxes to storage' : 'Fetching materials') : 'Running');
+    // Wear, breakdowns and accidents below follow the old "Running" test, so what the player is told can change
+    // without changing the economy: a machine idling with nothing to work on says so but is still counted as running.
+    const running = o.status === 'Running';
+    if (!made && running && starvedInputs(st, o, beltMap ||= beltStock(st)).length) o.status = 'Out of materials';
     if (made) {
       o.produced += made; o.producedMonth += made;
       st.stats.producedMonth[r.out] = (st.stats.producedMonth[r.out] || 0) + made; st.ledger.produced += made;
       pay(st, FAMILIES[o.family].price / ECONOMY.runningDivisor * (st.city.eventMul?.power || 1) * dt / 60, 'running', null);
     }
-    o.eff = made ? eff * prodMin / dt : (o.status === 'Running' ? eff : 0);
-    o.effAvg = o.effAvg * 0.97 + (o.status === 'Running' ? eff * prodMin / dt : 0) * 0.03;
+    o.eff = made ? eff * prodMin / dt : (running ? eff : 0);
+    o.effAvg = o.effAvg * 0.97 + (running ? eff * prodMin / dt : 0) * 0.03;
     // wear and breakdowns
     o.credits = Math.max(0, o.credits - 100 / FAMILIES[o.family].mtbf * dt / 60 * 0.9);
     const hazard = (0.004 + (o.credits < 25 ? 0.05 : 0)) * dt / 60 * (CA ? 1.5 - CA.metrics.uptime / 100 : 1);
-    if (o.status === 'Running' && chance(st, hazard)) {
+    if (running && chance(st, hazard)) {
       o.broken = true; o.repair = 0; o.status = 'Broken';
       memo(st, { from: 'Plant log', subject: `${objectLabel(st, o)} broke down`, important: !maint.length, sound: 'breakdown', body: `${objectLabel(st, o)} has stopped with a fault.${maint.length ? ` ${aTitle('maintenance', true)} is on the way.` : ` Nobody on staff can fix it, so an outside repair service comes first thing tomorrow.`}` });
     }
     // accidents at hand-fed input squares without a safety zone (each one adds risk)
-    if (o.status === 'Running' && isCell) {
+    if (running && !o.broken && isCell) {
       // inside a cell the walls keep hands out of hatches; the Safety metric sets the risk
       if (chance(st, 0.0045 * (1.5 - CA.metrics.safety / 100) * dt / 60)) { const who = present[randInt(st, 0, present.length - 1)]; accident(st, o, who, true); }
-    } else if (o.status === 'Running') {
+    } else if (running && !o.broken) {
       const unsafe = unsafeInputs(fl, o, L).length;
       if (unsafe && chance(st, 0.0045 * unsafe / r.inputs.length * dt / 60 * (1.4 - A(op, 'caution') / 100))) accident(st, o, op);
     }
   }
   laneStep(st, dt);
+  trackStalls(st, machines, ran, inShift, t0 + dt, dt);
   // maintenance crews: repair broken machines, then top up credits
   if (maintPower > 0) {
     const order = machines.filter(o => o.broken).concat(machines.filter(o => !o.broken).sort((a, b) => a.credits - b.credits));
@@ -1168,8 +1249,7 @@ function endOfDay(st) {
   }
   // president's advice every Monday
   if (weekday(st.time) === 1) presidentAdvice(st);
-  refreshOperators(st);
-  for (const o of st.floor.objects) if (isProducer(o) && !o.broken && o.mode === 'produce') o.status = o.operator == null ? 'No operator' : 'Shift over';
+  refreshOperators(st); // also sets every staffed machine to "Plant closed" for the night
   if (st.strike) strikeCheck(st);
 }
 
