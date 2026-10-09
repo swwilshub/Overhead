@@ -22,10 +22,10 @@ into four specs (one large, three medium).
 
 | Spec | Item | Impact | Effort | Pillars | Status | Evidence |
 |---|---|---|---|---|---|---|
-| 006 | **Touch controls for the floor:** drag to pan, pinch to zoom, tap to select, and a confirm bar before anything is placed. | 5 | L | 1, 4 | specced | Sam; M-1, M-2, M-9 |
-| 007 | **Phone shell:** a slim top bar, a bottom bar and a menu sheet in place of the sideways strip of links. | 5 | M | 1, 4 | specced | Sam; M-4, M-5, M-12 |
-| 008 | **Pop-ups and panels as bottom sheets:** dialogs at the thumb, the selected machine's panel on screen, toasts clear of the action. | 4 | M | 1, 4 | specced | Sam; M-3, M-8, M-10 |
-| 009 | **Pages that fit a phone:** tables as cards with a sort menu, the Nation page, 44 px targets, one row of Catalog tabs. | 4 | M | 1, 4 | specced | Sam; M-6, M-7, M-9, M-11 |
+| 006 | **Touch controls for the floor:** drag to pan, pinch to zoom, tap to select, and a confirm bar before anything is placed. | 5 | L | 1, 4 | review | Sam; M-1, M-2, M-9 |
+| 007 | **Phone shell:** a slim top bar, a bottom bar and a menu sheet in place of the sideways strip of links. | 5 | M | 1, 4 | review | Sam; M-4, M-5, M-12 |
+| 008 | **Pop-ups and panels as bottom sheets:** dialogs at the thumb, the selected machine's panel on screen, toasts clear of the action. | 4 | M | 1, 4 | review | Sam; M-3, M-8, M-10 |
+| 009 | **Pages that fit a phone:** tables as cards with a sort menu, the Nation page, 44 px targets, one row of Catalog tabs. | 4 | M | 1, 4 | review | Sam; M-6, M-7, M-9, M-11 |
 
 Left for later: the cell designer on a phone, tablet-specific layouts, swipe between sections, and everything left over
 from sprint 1.
@@ -52,4 +52,8 @@ from sprint 1.
 | 15 | **Test tidy-up:** `ui_test.py` hard-codes 42 cities in the caption check, never checks the cell editor's room-size step for junk text, and skips axe on Research. | 1 | S | 4 | new | QA on 002 (findings 1 and 2). |
 | 16 | **Tune stall notices:** a hands-off bot gets 216 to 424 "Machine stopped" memos in two years. Check with a playtest, then consider a longer gap per machine or one daily digest. | 3 | S | 1, 3 | new | Sprint 1 balance run. `STALL_REPEAT_MIN` in `game.js`. |
 | 17 | **Idle machines count as running for wear:** a machine with nothing to work on still wears and can have accidents, because the sim's wear rules test for the "Running" status. Decide whether that is right. | 2 | S | 2, 3 | new | Found in sprint 1 while changing statuses; left alone to keep the balance. |
+| 18 | **Landscape floor:** on a phone in landscape the bars and toolbar leave a short strip of floor, so you scroll to the plant. A layout with the tools beside the floor would fix it. | 3 | M | 1, 4 | new | Sprint 2 phone playtest (M-12), now measured. |
+| 19 | **The cell designer on a phone:** it keeps its desktop layout and its own scroll area. Needs touch placement of stations and furniture, and a layout that fits 390 px. | 4 | L | 1, 4 | new | Left out of sprint 2 (spec 009 out of scope). |
+| 20 | **Real-device pass:** the phone work was checked in emulated Chromium only. Play it on a real iPhone and Android phone (Safari, Chrome) and fix what differs (safe areas, `dvh`, dialog placement, pinch feel). | 4 | S | 4 | new | Release checklist row added in sprint 2. |
+| 21 | **More touch gestures:** swipe between sections, long press for a machine menu, two-finger rotate for the ghost, and pinch on the city map. | 2 | M | 4 | new | Out of scope for sprint 2. |
 

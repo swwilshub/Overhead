@@ -21,6 +21,10 @@ repository, the latest build is also published there.
 - **Set up a new company** to choose your starting scenario, difficulty and a scenario number (the same number always
   builds the same cities).
 
+On a phone or tablet the game uses a slim top bar, a bottom bar (Floor, Staff, In-basket, Menu) and bottom sheets for
+questions and for the machine you tap. On the factory floor, drag to look around, pinch to zoom, tap to select, and
+press **Place here** to put something down. Tables become cards, and nothing scrolls sideways.
+
 ### How it plays
 
 1. **Pick a city.** Bigger cities are bigger markets, but rent and wages cost more.

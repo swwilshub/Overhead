@@ -60,3 +60,22 @@ Newest first. Each entry: date, decision, reason.
 - **2026-10-09 — Needs attention refreshes in place and never takes focus.** If focus is on one of its buttons, the
   refresh waits. Reason: pillar 4 and spec 004; a list that redraws under a keyboard user is worse than a stale one.
 
+- **2026-10-09 — "Compact" means a phone in either orientation.** One definition for the whole interface: width up to
+  700 px or height up to 500 px (`src/ui/compact.js`). Touch behaviour on the floor depends on the pointer instead
+  (`pointer: coarse`), so a tablet gets touch gestures without the phone layout. Reason: a landscape phone is wider than
+  700 px but has almost no height, and a tablet needs touch but has room for the desktop layout.
+- **2026-10-09 — On a touch screen, placing is a decision.** The outline follows the finger and nothing is bought until
+  Place here. Reason: touch-down used to act at once, so a drag could buy a machine; the credit dialog from spec 005 would
+  only have asked after the damage.
+- **2026-10-09 — Phone menus are a bottom bar plus a Menu sheet, not a hamburger drawer.** Four large buttons along the
+  bottom (Floor, Staff, In-basket, Menu) and a sheet listing everything. Reason: the thumb reaches the bottom, and two taps
+  reach every section.
+- **2026-10-09 — Tables become cards with explicit roles.** Changing a table's `display` can drop its meaning for
+  screen readers in some browsers, so the card layout writes out the table, row, header and cell roles and the
+  column name each value belongs to. Reason: pillar 4; a phone screen reader user must hear a table.
+- **2026-10-09 — Checkboxes and radios are drawn by the page on touch screens.** A native one cannot be made
+  44 px. Reason: spec 009's tap-size rule, and an Options page full of 24 px checkboxes.
+- **2026-10-09 — The screen-reader-only helper needs a positioned parent.** Hidden text beside a table's last column
+  escaped the table's clipping and made phones zoom the whole page out. `main` and the table wrapper are now positioned
+  boxes. Reason: found while building spec 007; it affected every wide table.
+
