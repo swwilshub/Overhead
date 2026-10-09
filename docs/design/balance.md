@@ -45,7 +45,7 @@ checklist push towards a second line and belts.
 
 ## Seniority (specs 010 and 013)
 
-People learn on the job and are promoted, so pay and skill both rise. The test games promote 14 to 17 people in
+People learn on the job and are promoted, so pay and skill both rise. The test games promote 14 to 15 people in
 24 months; the first Senior arrives in month 5.3 to 5.5 and the first Director in month 22.7 to 23.3. Payroll ends
 about 50% above what the same people would cost had nobody been promoted, because everyone reaches Senior in the
 first year and a Senior costs 1.4 to 1.6 times a Junior.
