@@ -117,11 +117,14 @@ async def main():
 
         # ---- floor inspector: Assign and Retool
         mid = await st(pg, "st.floor.objects.find(o => o.kind === 'machine').id")
-        await pg.click(f'[data-key="eq-{mid}"]'); await pg.wait_for_timeout(300)
+        await pg.evaluate(f"() => window.__overhead.selectId({mid})"); await pg.wait_for_timeout(300)
         await enter_keeps(pg, '[data-key="mach-assign"]', 'Assign')
         await enter_keeps(pg, '[data-key="mach-retool"]', 'Retool')
         names = await button_names(pg)
         ok(not dupes(names), f'floor: no duplicate button names {dupes(names)}')
+        await pg.click('[data-key="hud-equipment"]'); await pg.wait_for_timeout(250)
+        names = await button_names(pg)
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
         sel_names = [x for x in names if x.startswith('Select, ')]
         ok(len(sel_names) >= 2 and any('#' + str(mid) in x for x in sel_names), f'equipment buttons named by row: {sel_names[:3]}')
         await axe(pg, 'floor with a machine selected')

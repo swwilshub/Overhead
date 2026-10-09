@@ -1,4 +1,4 @@
-import { h, frag, table, kv, announce, describe, confirmBox, pill, meter, field, nameBy } from '../dom.js';
+import { h, frag, table, kv, announce, describe, confirmBox, pill, meter, field, nameBy, dialog } from '../dom.js';
 import { app, go, render as rerender, act, reducedMotion, setupProblems, shortcutsOn, navPending, isCompact } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
@@ -11,6 +11,7 @@ import { money, num, pct, minuteOfDay, fmtShortDate, fmtDate } from '../../core/
 import { buyDialog } from './business.js';
 import { sfx } from '../sound.js';
 import { makeView, screenToTile, drawScene, tileXY, itemColor, T as TILE } from '../topdown.js';
+import { ZOOM_MIN, ZOOM_MAX, clampZoom, clampCam, zoomAbout, toScene, fitCam, reveal, visible, velocity, glide } from '../camera.js';
 import { confirmCredit, creditToAsk } from '../credit.js';
 import { editing, editorPrimary, editorKey, editorPanel, editorDraw, speakCell, cancelEditor, startEditCell, cellMetrics, suiteMetrics } from './cellEditor.js';
 import { analyseSuite } from '../../sim/suites.js';
@@ -21,43 +22,69 @@ export const live = true;
 
 let canvas = null, raf = 0, colors = null, colorsAt = 0, dragging = false;
 
-// ---------- zoom and touch (spec 006)
-// Zoom is a number from ZOOM_MIN to ZOOM_MAX, applied as the canvas's CSS size, so pinching never redraws. The canvas's own
-// resolution (v.pix) stays a whole number, chosen from the zoom, so the pixel art stays crisp.
-const TAP_PX = 10, TAP_MS = 500, ZOOM_MIN = 0.25, ZOOM_MAX = 4, ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+// ---------- the camera (spec 015)
+// The floor is one canvas the size of the page area, drawn in device pixels. Pan and zoom are a camera (v.camX, v.camY,
+// v.zoom): a scene pixel (sx, sy) is drawn at (sx * zoom - camX, sy * zoom - camY) on the surface (see camera.js).
+const TAP_PX = 10, TAP_MS = 500, ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 const touchUI = () => matchMedia('(pointer: coarse)').matches;
-const pixFor = z => Math.min(4, Math.max(1, Math.ceil(z - 1e-6)));
 const fmtZoom = z => `${+z.toFixed(2)}×`;
-const clampZoom = z => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const isPaint = v => v.mode === 'zone' || (v.mode === 'place' && !!v.placing?.repeat);
 const isGhost = v => (v.mode === 'place' && !v.placing?.repeat) || v.mode === 'move';
-function fitZoom() {
-  const fr = document.getElementById('floor-app'); if (!fr || !curView) return 1;
-  const maxH = parseFloat(getComputedStyle(fr).maxHeight) || innerHeight * 0.7;
-  return clampZoom(Math.min(fr.clientWidth / curView.W, maxH / curView.H));
+let vp = { w: 1, h: 1, dpr: 1 }, surfaceEl = null, ro = null, glideId = 0, curView = null;
+const camOf = v => ({ x: v.camX || 0, y: v.camY || 0 });
+const sceneSize = () => curView ? { W: curView.W, H: curView.H } : { W: 1, H: 1 };
+function setCam(v, c, z = v.zoom) { const k = clampCam(c, z, sceneSize(), vp); v.camX = k.x; v.camY = k.y; v.zoom = z; return k; }
+// room the floating controls take along the edges, so the plant fits in what is left: the tool bar on top, the buttons along
+// the bottom (and a sheet over them), and on a desktop the panel at the right
+function hudInsets() {
+  const q = sel => document.querySelector(sel), h = e => e ? e.offsetHeight + 12 : 0;
+  const side = q('#inspector'), panel = side && !side.classList.contains('away') && !side.classList.contains('sheet') ? side.offsetWidth + 12 : 0;
+  if (matchMedia('(max-height: 500px)').matches) {   // landscape phone: the tools are a column at the left
+    const t = q('.floor-tools'), z = q('.hud-zoom');
+    return { top: 8, left: t ? t.offsetWidth + 20 : 0, right: z ? z.offsetWidth + 20 : 0, bottom: h(q('.hud-bottom .hud-info')) + h(q('.place-bar')) + (side?.classList.contains('sheet') && !side.classList.contains('away') ? side.offsetHeight : 0) };
+  }
+  return { top: h(q('.floor-tools')) + h(q('.site-tabs')), bottom: h(q('.hud-bottom .hud-info')) + h(q('.place-bar')) + (side?.classList.contains('sheet') && !side.classList.contains('away') ? side.offsetHeight : 0), right: panel };
 }
+function fitCamera() { return fitCam(sceneSize(), vp, 12, hudInsets()); }
+// the first view: the whole plant, but never bigger than 2×, and on a desktop never smaller than 1× (a phone may go down to ½×)
+function initCamera(v) { const f = fitCamera(), z = Math.min(2, Math.max(isCompact() ? 0.5 : 1, f.zoom)); const i = hudInsets(); setCam(v, z === f.zoom ? f : { x: -12 - 0, y: -12 - i.top }, z); }
+function syncZoomUI() {
+  const v = vs();
+  for (const n of document.querySelectorAll('.zoom-num')) n.textContent = fmtZoom(v.zoom);
+  const zo = document.querySelectorAll('[data-key="ft-zo"]'), zi = document.querySelectorAll('[data-key="ft-zi"]');
+  for (const b of zo) b.disabled = v.zoom <= ZOOM_MIN + 1e-6; for (const b of zi) b.disabled = v.zoom >= ZOOM_MAX - 1e-6;
+}
+// zoom to z keeping the surface point (ax, ay) fixed; the middle of the view when none is given
 function zoomTo(z, ax, ay) {
-  const v = vs(), fr = document.getElementById('floor-app'); if (!fr || !canvas || !curView) return;
-  z = clampZoom(z); const old = v.zoom || 2, r = fr.getBoundingClientRect();
-  if (ax == null) { ax = r.left + fr.clientWidth / 2; ay = r.top + fr.clientHeight / 2; }
-  const px = ax - r.left - fr.clientLeft, py = ay - r.top - fr.clientTop;      // the anchor, inside the scrolling frame
-  const cx = (fr.scrollLeft + px) / old, cy = (fr.scrollTop + py) / old;       // and what is under it, at zoom 1
-  v.zoom = z;
-  canvas.style.width = curView.W * z + 'px'; canvas.style.height = curView.H * z + 'px';
-  const pix = pixFor(z); if (pix !== v.pix) { v.pix = pix; canvas.width = curView.W * pix; canvas.height = curView.H * pix; }
-  fr.scrollLeft = cx * z - px; fr.scrollTop = cy * z - py; v.scrollX = fr.scrollLeft; v.scrollY = fr.scrollTop;
-  const num = document.querySelector('.floor-tools .zoom-num'); if (num) num.textContent = fmtZoom(z);
-  const zo = document.querySelector('[data-key="ft-zo"]'), zi = document.querySelector('[data-key="ft-zi"]');
-  if (zo) zo.disabled = z <= ZOOM_MIN + 1e-6; if (zi) zi.disabled = z >= ZOOM_MAX - 1e-6;
+  const v = vs(); if (!curView) return; z = clampZoom(z);
+  if (ax == null) { ax = vp.w / 2; ay = vp.h / 2; }
+  setCam(v, zoomAbout(camOf(v), v.zoom, z, ax, ay), z); syncZoomUI();
 }
 const announceZoom = () => announce(`Zoom ${Math.round(vs().zoom * 100)} percent.`, 'polite', false);
 function stepZoom(dir) {
   const z = vs().zoom, next = dir > 0 ? ZOOM_STEPS.find(x => x > z + 0.01) : [...ZOOM_STEPS].reverse().find(x => x < z - 0.01);
   if (next) { zoomTo(next); announceZoom(); }
 }
-function fitView() { zoomTo(fitZoom()); const fr = document.getElementById('floor-app'); if (fr) { fr.scrollLeft = 0; fr.scrollTop = 0; } announceZoom(); }
+function fitView() { const v = vs(), f = fitCamera(); setCam(v, f, f.zoom); syncZoomUI(); announceZoom(); }
+const stopGlide = () => { cancelAnimationFrame(glideId); glideId = 0; };
 window.addEventListener('pointerup', () => { dragging = false; });
+// where a tile's middle is on the page, for tests and for anything that has to point at it
+export function tileScreen(tx, ty) {
+  const v = vs(), r = surfaceEl?.getBoundingClientRect(); if (!r || !curView) return null;
+  const [lx, ly] = tileXY(curView, tx + 0.5, ty + 0.5); return [r.left + lx * v.zoom - (v.camX || 0), r.top + ly * v.zoom - (v.camY || 0)];
+}
+// a tile with nothing on it, whose middle is on screen and not under a floating control (a test aid)
+export function findEmptyTile() {
+  const st = app.st, fl = st.floor, r = surfaceEl?.getBoundingClientRect(); if (!r || !curView) return null;
+  for (let y = fl.h - 1; y >= 0; y--) for (let x = 0; x < fl.w; x++) {
+    if (objectAt(fl, x, y)) continue;
+    const pt = tileScreen(x, y); if (!pt || pt[0] < r.left + 4 || pt[0] > r.right - 4 || pt[1] < r.top + 4 || pt[1] > r.bottom - 4) continue;
+    const e = document.elementFromPoint(pt[0], pt[1]); if (e && e.closest('#floor-app')) return [x, y];
+  }
+  return null;
+}
+export const cameraState = () => { const v = vs(); return { zoom: v.zoom, x: v.camX || 0, y: v.camY || 0, w: vp.w, h: vp.h, dpr: vp.dpr, W: curView?.W, H: curView?.H, cw: canvas?.width, ch: canvas?.height }; };
 
 export function startPlacing(spec) {
   const v = vs(); v.mode = 'place'; v.placing = spec; v.rot = 0; v.sel = null; v.centerGhost = touchUI() && !spec.repeat;
@@ -68,45 +95,54 @@ export function startPlacing(spec) {
 
 const onNewSite = (st, v) => !!st.move && v.site === 'new';
 let followId = null, lastKeyNav = -1e9;
+const zoomGroup = () => h('div', { class: 'zoom-group', role: 'group', 'aria-label': 'Zoom' },
+  h('button', { type: 'button', 'aria-label': 'Zoom out', 'data-key': 'ft-zo', disabled: vs().zoom <= ZOOM_MIN + 1e-6, onclick: () => stepZoom(-1) }, '−'),
+  h('span', { class: 'num zoom-num', 'aria-live': 'off' }, fmtZoom(vs().zoom || 1)),
+  h('button', { type: 'button', 'aria-label': 'Zoom in', 'data-key': 'ft-zi', disabled: vs().zoom >= ZOOM_MAX - 1e-6, onclick: () => stepZoom(1) }, '+'),
+  h('button', { type: 'button', 'data-key': 'ft-fit', onclick: fitView }, 'Fit'));
+const keyHelp = () => ['Arrow keys move the cursor one square (Shift moves five). Enter selects or places. R rotates. M moves the selected item. Delete sells it. Escape cancels. ',
+  shortcutsOn() ? 'Space starts or pauses the clock, and [ ], ? and g then a letter work here too. ' : 'Space also selects or places. ', 'Plus and minus zoom, 0 fits the whole plant.'];
+const helpBody = () => h('div', { class: 'stack' }, h('p', null, touchUI() ? ['Drag to look around and pinch to zoom. Tap a machine to select it. When placing, drag the outline, then press Place here. With a keyboard: ', keyHelp()] : ['Click a machine to select it. Drag empty floor to look around (or hold the middle button), and use the wheel to zoom. ', keyHelp()]));
 export function render() {
   const st = app.st, v = vs();
   if (!st.move) v.site = 'old';
   const newSite = onNewSite(st, v), fl = newSite ? st.move.floor : st.floor;
   if (newSite && v.mode !== 'select') { v.mode = 'select'; v.placing = null; v.moving = null; v.cell = null; }
   const view = makeView(fl, 2); curView = view;
-  // first time: the old default of 2×; on a phone, the plant fitted to the screen (between 1× and 2×)
-  if (!v.zoom) v.zoom = isCompact() ? Math.min(2, Math.max(1, ((document.getElementById('main')?.clientWidth || innerWidth) - 28) / view.W)) : 2;
-  v.pix = pixFor(v.zoom);
-  canvas = h('canvas', { width: view.W * v.pix, height: view.H * v.pix, 'aria-hidden': 'true', style: { imageRendering: 'pixelated', width: view.W * v.zoom + 'px', height: view.H * v.zoom + 'px' } });
+  canvas ||= h('canvas', { class: 'floor-canvas', 'aria-hidden': 'true' });
   const helpId = 'floor-help';
-  const appEl = h('div', { id: 'floor-app', class: 'floor-frame', role: 'application', tabindex: 0, 'aria-roledescription': 'factory floor', 'aria-label': `Factory floor, ${fl.w} squares wide and ${fl.h} deep. ${modeText(v)}`, 'aria-describedby': helpId }, canvas);
-  wireCanvas(appEl, st, v, view);
+  const appEl = h('div', { id: 'floor-app', class: 'floor-surface', role: 'application', tabindex: 0, 'aria-roledescription': 'factory floor', 'aria-label': `Factory floor, ${fl.w} squares wide and ${fl.h} deep. ${modeText(v)}`, 'aria-describedby': helpId }, canvas);
+  surfaceEl = appEl; wireSurface(appEl, st, v, view);
+  const compact = isCompact();
   const tools = h('div', { class: 'floor-tools', role: 'toolbar', 'aria-label': 'Floor tools' },
     h('button', { type: 'button', 'aria-pressed': String(v.mode === 'select'), 'data-key': 'ft-select', onclick: () => setMode('select') }, 'Select'),
     h('button', { type: 'button', 'aria-pressed': String(v.mode === 'zone'), 'data-key': 'ft-zone', onclick: () => setMode('zone') }, 'Paint zones'),
-    h('select', { 'aria-label': 'Zone to paint', 'data-key': 'ft-zonesel', hidden: isCompact() && v.mode !== 'zone', onchange: e => { v.zone = +e.target.value; setMode('zone'); } }, ZONE_INFO.map((z, i) => h('option', { value: i, selected: v.zone === i }, z.name))),
+    h('select', { 'aria-label': 'Zone to paint', 'data-key': 'ft-zonesel', hidden: compact && v.mode !== 'zone', onchange: e => { v.zone = +e.target.value; setMode('zone'); } }, ZONE_INFO.map((z, i) => h('option', { value: i, selected: v.zone === i }, z.name))),
     h('button', { type: 'button', 'aria-pressed': String(v.mode === 'place' && v.placing?.kind === 'conveyor'), 'data-key': 'ft-belt', onclick: () => startPlacing({ kind: 'conveyor', label: 'conveyor belt', repeat: true }) }, `Lay conveyor (${money(KINDS.conveyor.price)})`),
     h('button', { type: 'button', 'data-key': 'ft-catalog', onclick: () => go('catalog') }, 'Catalog…'),
-    h('span', { style: { flex: '1' } }),
-    h('div', { class: 'zoom-group', role: 'group', 'aria-label': 'Zoom' },
-      h('button', { type: 'button', 'aria-label': 'Zoom out', 'data-key': 'ft-zo', disabled: v.zoom <= ZOOM_MIN + 1e-6, onclick: () => stepZoom(-1) }, '−'),
-      h('span', { class: 'num zoom-num', 'aria-live': 'off' }, fmtZoom(v.zoom)),
-      h('button', { type: 'button', 'aria-label': 'Zoom in', 'data-key': 'ft-zi', disabled: v.zoom >= ZOOM_MAX - 1e-6, onclick: () => stepZoom(1) }, '+'),
-      h('button', { type: 'button', 'data-key': 'ft-fit', onclick: fitView }, 'Fit')));
-  const keys = ['Arrow keys move the cursor one square (Shift moves five). Enter selects or places. R rotates. M moves the selected item. Delete sells it. Escape cancels. ',
-    shortcutsOn() ? 'Space starts or pauses the clock, and [ ], ? and g then a letter work here too.' : 'Space also selects or places.'];
-  const help = h('p', { id: helpId, class: 'floor-help' }, touchUI() ? ['Drag to look around and pinch to zoom. Tap a machine to select it. When placing, drag the outline, then press Place here. With a keyboard: ', keys] : keys);
+    compact ? null : [h('span', { style: { flex: '1' } }), zoomGroup()]);
   const fixes = newSite ? [] : setupProblems(st);
   const siteTabs = st.move ? h('div', { class: 'site-tabs', role: 'tablist', 'aria-label': 'Which building' },
     [['old', `Current plant · ${st.city.lots[st.lotId].addr}`], ['new', `New site · ${st.city.lots[st.move.lotId].addr} · ${Math.round(G.moveProgress(st) * 100)}% built`]].map(([k, label]) =>
-      h('button', { type: 'button', role: 'tab', 'aria-selected': String((v.site || 'old') === k), 'data-key': 'site-' + k, onclick: () => { v.site = k; v.sel = null; followId = null; rerender({}); document.getElementById('floor-app')?.focus(); announce(k === 'new' ? 'Showing the new site under construction.' : 'Showing the current plant.', 'polite', false); } }, label))) : null;
-  return h('div', { class: 'stack floor-page' },
-    h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Factory floor'), h('p', null, `${st.city.lots[st.lotId].addr} · ${num(st.city.lots[st.lotId].sqft)} sq ft · storage ${num(G.boxesStored(st))} of ${num(storageCapacity(fl))} boxes`))),
-    h('div', { id: 'needs-wrap', 'data-sig': needsSig(fixes) }, needsAttention(st, fixes)),
-    h('div', { class: 'floor-layout' },
-      h('div', { class: 'stack', style: { minWidth: 0 } }, siteTabs, newSite ? null : tools, appEl, placeBar(st, v, newSite), help, legend()),
-      h('aside', { class: 'stack' + (asSheet(v, newSite) ? ' sheet' : '') + (v.sheetOpen ? ' open' : ''), 'aria-label': editing() ? 'Cell blueprint' : newSite ? 'Construction' : 'Inspector', id: 'inspector' }, newSite ? movePanel(st) : editing() ? editorPanel(st) : inspector(st, v))),
-    equipmentTable(st, v));
+      h('button', { type: 'button', role: 'tab', 'aria-selected': String((v.site || 'old') === k), 'data-key': 'site-' + k, onclick: () => { v.site = k; v.sel = null; followId = null; rerender({}); document.getElementById('floor-app')?.focus(); announce(k === 'new' ? 'Showing the new site.' : 'Showing the current plant.', 'polite', false); } }, label))) : null;
+  const lot = st.city.lots[st.lotId];
+  const aside = h('aside', { class: 'stack hud-panel', 'aria-label': editing() ? 'Cell blueprint' : newSite ? 'Construction' : 'Inspector', id: 'inspector' }, newSite ? movePanel(st) : editing() ? editorPanel(st) : inspector(st, v));
+  panelClasses(aside, st, v, newSite);
+  const hud = h('div', { class: 'floor-hud' },
+    h('div', { class: 'hud-left' }, siteTabs, newSite ? null : tools, h('div', { id: 'needs-wrap', 'data-sig': needsSig(fixes) }, needsAttention(st, fixes))),
+    compact && !newSite ? h('div', { class: 'hud-zoom' }, zoomGroup()) : null,
+    aside,
+    h('div', { class: 'hud-bottom' },
+      placeBar(st, v, newSite),
+      h('div', { class: 'hud-info' },
+        h('p', { class: 'hud-chip' }, `${lot.addr} · ${num(lot.sqft)} sq ft · storage ${num(G.boxesStored(st))} of ${num(storageCapacity(fl))} boxes`),
+        h('div', { class: 'row hud-buttons' },
+          h('button', { type: 'button', 'data-key': 'hud-help', onclick: () => dialog('Help', helpBody(), [{ label: 'Close', value: null, primary: true }], { wide: true }) }, 'Help'),
+          h('button', { type: 'button', 'data-key': 'hud-legend', onclick: () => dialog('Legend', legend(), [{ label: 'Close', value: null, primary: true }], { wide: true }) }, 'Legend'),
+          h('button', { type: 'button', 'data-key': 'hud-equipment', onclick: () => dialog('Equipment', equipmentTable(st, v, true), [{ label: 'Close', value: null, primary: true }], { wide: true }) }, 'Equipment list'),
+          compact ? (newSite || editing() ? null : h('button', { type: 'button', 'data-key': 'hud-info', 'aria-expanded': String(!!v.infoOpen), 'aria-controls': 'inspector', onclick: e => { v.infoOpen = !v.infoOpen; if (v.infoOpen) { v.sel = null; v.sheetOpen = true; } e.currentTarget.setAttribute('aria-expanded', String(v.infoOpen)); updateInspector(); } }, 'Checklist'))
+            : h('button', { type: 'button', 'data-key': 'hud-panel', 'aria-expanded': String(!v.panelHidden), 'aria-controls': 'inspector', onclick: () => { v.panelHidden = !v.panelHidden; updateInspector(); const b = document.querySelector('[data-key="hud-panel"]'); if (b) b.setAttribute('aria-expanded', String(!v.panelHidden)); } }, 'Panel')))));
+  return h('div', { class: 'floor-stage' }, h('h1', { class: 'sr-only' }, 'Factory floor'), appEl, h('p', { id: helpId, class: 'sr-only' }, keyHelp(), touchUI() ? ' Drag to look around and pinch to zoom. Tap a machine to select it.' : ' Drag empty floor to look around, and use the wheel to zoom.'), hud);
 }
 function movePanel(st) {
   const mv = st.move, p = G.moveProgress(st), lot = st.city.lots[mv.lotId], n = mv.order.length;
@@ -152,55 +188,84 @@ function legend() {
 }
 
 // ---------- canvas input
-function wireCanvas(el, st, v, view) {
+// ---------- one surface for touch, pen and mouse
+// Everything starts as a pointer event on the surface, captured so a drag keeps going when the finger leaves it, with
+// touch-action: none so the browser never scrolls or zooms underneath. Controls floating over the floor are not inside the
+// surface, so their touches never reach it.
+//   paint tools   (zones, conveyor)  press and drag paints
+//   ghost tools   (placing, moving)  the outline follows the pointer; a mouse press places, a touch waits for Place here
+//   tap tools     (select, cell designer, the new site)  a tap acts; a drag pans the map
+function wireSurface(el, st, v, view) {
   let lastTouch = -1e9;
-  const toTile = e => { const r = canvas.getBoundingClientRect(); return screenToTile(view, (e.clientX - r.left) / r.width * view.W, (e.clientY - r.top) / r.height * view.H); };
-  canvas.addEventListener('pointermove', e => { if (e.pointerType === 'touch') return; const [x, y] = toTile(e); if (x === v.cx && y === v.cy) return; v.cx = x; v.cy = y; if (dragging && (v.mode === 'zone' || (v.mode === 'place' && v.placing?.repeat))) primary(st, v, true); });
-  canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') return; if (e.button === 2) return; el.focus(); const [x, y] = toTile(e); v.cx = x; v.cy = y; dragging = true; primary(st, v); });
-  canvas.addEventListener('contextmenu', e => { e.preventDefault(); if (performance.now() - lastTouch > 1500) cancel(v); }); // a long press is not a right click
-  el.addEventListener('scroll', () => { v.scrollX = el.scrollLeft; v.scrollY = el.scrollTop; }, { passive: true });
-  // ---- touch: one finger pans (or paints, or moves the ghost, depending on the tool), a tap selects, two fingers pan and zoom
-  const pts = new Map(); let pinch = null;
-  canvas.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'touch') return;
-    e.preventDefault(); lastTouch = performance.now();
-    pts.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, l0: el.scrollLeft, t0s: el.scrollTop, t0: performance.now(), moved: false, dead: false });
-    if (pts.size === 2) { // a second finger: stop whatever the first began and start a pinch
-      const [a, b] = [...pts.values()]; dragging = false; for (const q of pts.values()) q.dead = true;
-      pinch = { d0: dist(a, b), z0: v.zoom, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }; return;
+  const rect = () => el.getBoundingClientRect();
+  const local = e => { const r = rect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  const toTile = e => { const p = local(e), [sx, sy] = toScene(camOf(v), v.zoom, p.x, p.y); return screenToTile(view, sx, sy); };
+  const ptrs = new Map(); let pinch = null, pan = null, samples = [];
+  const moveCursor = e => { const [x, y] = toTile(e); if (x === v.cx && y === v.cy) return false; v.cx = x; v.cy = y; return true; };
+  const startPan = (p, e) => { pan = { id: e.pointerId, x0: v.camX || 0, y0: v.camY || 0, px: p.sx, py: p.sy }; samples = []; el.classList.add('panning'); };
+  const endPan = () => { pan = null; el.classList.remove('panning'); };
+  const dead = () => { for (const q of ptrs.values()) q.dead = true; };
+  el.addEventListener('contextmenu', e => { e.preventDefault(); if (performance.now() - lastTouch > 1500) cancel(v); }); // a long press is not a right click
+  el.addEventListener('pointerdown', e => {
+    if (e.button === 2) return;
+    stopGlide(); el.focus({ preventScroll: true });
+    if (e.pointerType !== 'mouse') lastTouch = performance.now();
+    try { el.setPointerCapture(e.pointerId); } catch {}
+    const p = { id: e.pointerId, type: e.pointerType, button: e.button, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t0: performance.now(), moved: false, dead: false };
+    ptrs.set(e.pointerId, p);
+    if (e.pointerType === 'mouse' && e.button === 1) { e.preventDefault(); startPan(p, e); p.pan = true; return; }   // middle button pans in any mode
+    if (ptrs.size === 2) {   // a second finger: stop whatever the first began and start a pinch
+      const [a, b] = [...ptrs.values()]; dragging = false; endPan(); dead();
+      const r = rect(); pinch = { d0: Math.max(1, dist(a, b)), z0: v.zoom, mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top }; return;
     }
-    if (pts.size > 2 || pinch) return;
-    if (isPaint(v) || isGhost(v)) {
-      const [x, y] = toTile(e); v.cx = x; v.cy = y; el.focus({ preventScroll: true });
-      if (isPaint(v)) { dragging = true; primary(st, v); } else speakCursor(st, v);
-    }
+    if (ptrs.size > 2 || pinch) { p.dead = true; return; }
+    if (isPaint(v)) { moveCursor(e); dragging = true; primary(st, v); return; }
+    if (isGhost(v)) { moveCursor(e); if (e.pointerType === 'mouse') primary(st, v); else speakCursor(st, v); return; }
   });
-  canvas.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'touch') return;
-    const p = pts.get(e.pointerId); if (!p) return; p.x = e.clientX; p.y = e.clientY;
+  el.addEventListener('pointermove', e => {
+    const p = ptrs.get(e.pointerId);
+    if (!p) { if (e.pointerType === 'mouse') moveCursor(e); return; }   // a mouse hovering
+    p.x = e.clientX; p.y = e.clientY;
     if (pinch) {
-      const [a, b] = [...pts.values()], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      zoomTo(pinch.z0 * dist(a, b) / pinch.d0, mx, my);
-      el.scrollLeft -= mx - pinch.mx; el.scrollTop -= my - pinch.my; pinch.mx = mx; pinch.my = my; return;
+      if (ptrs.size < 2) return;
+      const [a, b] = [...ptrs.values()], r = rect(), mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+      const z = clampZoom(pinch.z0 * dist(a, b) / pinch.d0), c = zoomAbout(camOf(v), v.zoom, z, mx, my);
+      setCam(v, { x: c.x - (mx - pinch.mx), y: c.y - (my - pinch.my) }, z); pinch.mx = mx; pinch.my = my; syncZoomUI(); return;
     }
-    if (pts.size !== 1 || p.dead) return;
-    if (isPaint(v) || isGhost(v)) {
-      const [x, y] = toTile(e); if (x === v.cx && y === v.cy) return; v.cx = x; v.cy = y;
-      if (isPaint(v)) { if (dragging) primary(st, v, true); } else speakCursor(st, v);
+    if (p.dead || ptrs.size !== 1 && !p.pan) return;
+    if (pan && pan.id === e.pointerId) {
+      const dx = e.clientX - pan.px, dy = e.clientY - pan.py;
+      setCam(v, { x: pan.x0 - dx, y: pan.y0 - dy }); samples.push({ x: e.clientX, y: e.clientY, t: performance.now() }); if (samples.length > 8) samples.shift(); return;
+    }
+    if (isPaint(v)) { if (moveCursor(e) && dragging) primary(st, v, true); return; }
+    if (isGhost(v)) { if (moveCursor(e) && p.type !== 'mouse') speakCursor(st, v); return; }
+    if (!p.moved && Math.hypot(p.x - p.sx, p.y - p.sy) > TAP_PX) { p.moved = true; startPan(p, e); }   // a drag on empty floor or a machine pans, and selects nothing
+  });
+  const end = e => {
+    const p = ptrs.get(e.pointerId); if (!p) return; ptrs.delete(e.pointerId);
+    try { el.releasePointerCapture(e.pointerId); } catch {}
+    if (pinch) { if (ptrs.size < 2) { pinch = null; announceZoom(); } dead(); return; }
+    if (p.pan) { endPan(); return; }
+    const cancelled = e.type !== 'pointerup';
+    if (pan && pan.id === e.pointerId) {
+      endPan();
+      if (!cancelled && p.type !== 'mouse' && !reducedMotion()) { const vel = velocity(samples, performance.now()); if (Math.hypot(vel.x, vel.y) > 0.2) startGlide(v, vel); }
       return;
     }
-    const dx = p.x - p.sx, dy = p.y - p.sy;      // Select and the cell designer: a drag pans, a tap acts
-    if (!p.moved && Math.hypot(dx, dy) > TAP_PX) p.moved = true;
-    if (p.moved) { el.scrollLeft = p.l0 - dx; el.scrollTop = p.t0s - dy; }
-  });
-  const touchEnd = e => {
-    if (e.pointerType !== 'touch') return;
-    const p = pts.get(e.pointerId); if (!p) return; pts.delete(e.pointerId);
-    if (pinch) { if (pts.size < 2) { pinch = null; announceZoom(); } for (const q of pts.values()) q.dead = true; return; }
-    if (p.dead || e.type !== 'pointerup' || isPaint(v) || isGhost(v) || p.moved || performance.now() - p.t0 >= TAP_MS) return;
-    const [x, y] = toTile(e); v.cx = x; v.cy = y; el.focus({ preventScroll: true }); primary(st, v);   // a tap
+    if (p.dead) return;
+    if (isPaint(v)) { dragging = false; return; }
+    if (isGhost(v) || cancelled) return;
+    if (p.type !== 'mouse' && performance.now() - p.t0 >= TAP_MS) return;   // a long press is not a tap
+    moveCursor(e); primary(st, v);                                            // a tap, or a click
   };
-  canvas.addEventListener('pointerup', touchEnd); canvas.addEventListener('pointercancel', touchEnd);
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  el.addEventListener('lostpointercapture', e => { if (ptrs.has(e.pointerId)) end({ type: 'pointercancel', pointerId: e.pointerId }); });
+  // the wheel zooms about the pointer, Shift or a sideways wheel pans, and Ctrl (a trackpad pinch) zooms
+  el.addEventListener('wheel', e => {
+    e.preventDefault(); stopGlide(); const p = local(e);
+    if (!e.ctrlKey && (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY))) { const k = e.deltaMode === 1 ? 16 : 1; setCam(v, { x: (v.camX || 0) + (e.deltaX || e.deltaY) * k, y: (v.camY || 0) + (e.deltaX ? e.deltaY : 0) * k }); return; }
+    const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; zoomTo(v.zoom * Math.exp(-d * (e.ctrlKey ? 0.01 : 0.0015)), p.x, p.y);
+  }, { passive: false });
   el.addEventListener('keydown', e => {
     if (navPending(e)) return; // the key after g belongs to navigation (app.js), so g m doesn't start a move
     const fl = onNewSite(st, v) ? st.move.floor : st.floor; const step = e.shiftKey ? 5 : 1;
@@ -209,18 +274,35 @@ function wireCanvas(el, st, v, view) {
     if (mv) { lastKeyNav = performance.now(); e.preventDefault(); const nx = Math.max(0, Math.min(fl.w - 1, v.cx + mv[0])), ny = Math.max(0, Math.min(fl.h - 1, v.cy + mv[1])); sfx(nx === v.cx && ny === v.cy ? 'bump' : 'tick'); v.cx = nx; v.cy = ny; scrollToCursor(); speakCursor(st, v); return; }
     if (e.key === 'Enter' || (e.key === ' ' && !shortcutsOn())) { e.preventDefault(); primary(st, v); return; } // with shortcuts on, Space runs the clock
     if (e.key === 'Escape') { e.preventDefault(); cancel(v); return; }
+    if ((e.key === '+' || e.key === '=') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); stepZoom(1); return; }
+    if ((e.key === '-' || e.key === '_') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); stepZoom(-1); return; }
+    if (e.key === '0' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); fitView(); return; }
     if (e.key === 'r' || e.key === 'R') { e.preventDefault(); v.rot = (v.rot + 1) % 4; announce(`Rotated to ${v.rot * 90} degrees.`, 'polite', false); speakCursor(st, v); return; }
     if ((e.key === 'm' || e.key === 'M') && v.sel) { e.preventDefault(); beginMove(st, v); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && v.sel) { e.preventDefault(); sellSelected(st, v); return; }
     if (e.key === 'i' || e.key === 'I') { e.preventDefault(); if (v.sel && isCompact() && !v.sheetOpen) { v.sheetOpen = true; updateInspector(); } document.querySelector('#inspector h2')?.focus(); }
   });
 }
-let curView = null;
+// after a flick the map keeps going and slows down; it stops at a limit or when touched
+function startGlide(v, vel) {
+  stopGlide(); let last = performance.now(), cur = { x: -vel.x, y: -vel.y };     // the map moves with the finger: against the camera
+  const tick = now => {
+    const dt = Math.min(48, now - last); last = now;
+    const c = camOf(v), k = setCam(v, { x: c.x + cur.x * dt, y: c.y + cur.y * dt });
+    if (Math.abs(k.x - (c.x + cur.x * dt)) > 0.5) cur.x = 0; if (Math.abs(k.y - (c.y + cur.y * dt)) > 0.5) cur.y = 0;
+    cur = glide(cur, dt);
+    glideId = Math.hypot(cur.x, cur.y) > 0.02 ? requestAnimationFrame(tick) : 0;
+  };
+  glideId = requestAnimationFrame(tick);
+}
+// keep the cursor in view, clear of the panels floating over the edges
 function scrollToCursor() {
-  const fr = document.getElementById('floor-app'); if (!fr || !curView) return; const v = vs();
-  const [lx, ly] = tileXY(curView, v.cx + 0.5, v.cy + 0.5); const x = lx * v.zoom, y = ly * v.zoom, m = TILE * 2 * v.zoom;
-  if (x < fr.scrollLeft + m) fr.scrollLeft = x - m * 2; else if (x > fr.scrollLeft + fr.clientWidth - m) fr.scrollLeft = x - fr.clientWidth + m * 2;
-  if (y < fr.scrollTop + m) fr.scrollTop = y - m * 2; else if (y > fr.scrollTop + fr.clientHeight - m) fr.scrollTop = y - fr.clientHeight + m * 2;
+  const v = vs(); if (!curView) return;
+  const [lx, ly] = tileXY(curView, v.cx + 0.5, v.cy + 0.5), m = Math.max(TILE * 2 * v.zoom, 48);
+  const panel = document.getElementById('inspector'), right = panel && !panel.classList.contains('away') && !panel.classList.contains('sheet') ? panel.offsetWidth + 12 : 0;
+  const bottom = panel && panel.classList.contains('sheet') && !panel.classList.contains('away') ? panel.offsetHeight : 0;
+  const view = { w: vp.w - right, h: vp.h - bottom };
+  setCam(v, reveal(camOf(v), v.zoom, view, lx, ly, m));
 }
 let speakT = 0;
 function speakCursor(st, v) {
@@ -320,8 +402,14 @@ export function selectObj(o) {
 // ---------- inspector
 // The list of things that need the owner, in its own container so a light refresh can swap it without a redraw.
 function needsAttention(st, fixes) {
-  const fl = st.floor;
-  return fixes.length ? h('div', { class: 'notice', role: 'region', 'aria-label': 'Setup issues' }, h('strong', null, 'Needs attention: '), h('ul', { style: { margin: '4px 0 0', paddingLeft: '1.2em' } }, fixes.map(f => { const t = h('span', null, f.text); return h('li', null, t, ' ', nameBy(h('button', { class: 'link', type: 'button', onclick: () => { if (f.obj) { const o = fl.objects.find(o => o.id === f.obj); selectObj(o); } else go(f.view); } }, f.obj ? 'Show me' : 'Fix'), t)); }))) : null;
+  const fl = st.floor, v = vs();
+  if (!fixes.length) return null;
+  const items = fixes.map(f => { const t = h('span', null, f.text); return h('li', null, t, ' ', nameBy(h('button', { class: 'link', type: 'button', onclick: () => { if (f.obj) { const o = fl.objects.find(o => o.id === f.obj); selectObj(o); } else go(f.view); } }, f.obj ? 'Show me' : 'Fix'), t)); });
+  // a card over the floor that folds down to one line (open by default on a desktop, folded on a phone)
+  const d = h('details', { class: 'notice needs-card', 'aria-label': 'Setup issues', ontoggle: () => { v.needsOpen = d.open; } },
+    h('summary', null, h('strong', null, `Needs attention (${fixes.length})`)), h('ul', { style: { margin: '4px 0 0', paddingLeft: '1.2em' } }, items));
+  d.open = v.needsOpen ?? !isCompact();
+  return d;
 }
 const needsSig = fixes => fixes.map(f => f.text + '|' + (f.obj ?? f.view)).join('\n');
 function updateNeeds() {
@@ -334,14 +422,28 @@ function updateNeeds() {
 }
 // On a phone the panel for the selected item is a sheet over the bottom of the screen (spec 008), so it is seen where the
 // player tapped; with nothing selected it stays under the floor as the checklist and Cursor card.
-const asSheet = (v, newSite) => isCompact() && !!v.sel && !editing() && !newSite;
+// The panel over the floor. On a desktop it floats over the right edge and can be hidden; on a phone it is a sheet over the bottom
+// of the screen (spec 008), shown for a selection, the cell designer, the new site, or when the Checklist button opens it.
+const showPanel = (v, newSite) => isCompact() ? (!!v.sel || !!v.infoOpen || editing() || newSite) : (!v.panelHidden || editing() || newSite);
+const asSheet = (v, newSite) => isCompact() && showPanel(v, newSite);
+function panelClasses(el, st, v, newSite) {
+  el.classList.toggle('sheet', asSheet(v, newSite));
+  el.classList.toggle('open', !!v.sheetOpen || (isCompact() && (editing() || newSite || (!!v.infoOpen && !v.sel))));
+  el.classList.toggle('away', !showPanel(v, newSite));
+}
+// how tall the bottom sheet is, so what floats along the bottom sits above it
+function syncLayout() {
+  const stage = document.querySelector('.floor-stage'), el = document.getElementById('inspector'); if (!stage) return;
+  const sheet = el && el.classList.contains('sheet') && !el.classList.contains('away');
+  stage.style.setProperty('--sheet-h', sheet ? el.offsetHeight + 'px' : '0px');
+}
 let sheetFor = null; // the selection the sheet was last opened for: a new selection starts collapsed
-function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (v.sel !== sheetFor) { sheetFor = v.sel; v.sheetOpen = false; } if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(frag(inspector(st, v))); el.classList.toggle('sheet', asSheet(v, st.move && v.site === 'new')); el.classList.toggle('open', !!v.sheetOpen); }
+function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (v.sel !== sheetFor) { sheetFor = v.sel; v.sheetOpen = false; } if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(frag(inspector(st, v))); panelClasses(el, st, v, !!st.move && v.site === 'new'); syncLayout(); }
 // Collapsed, the sheet shows the item's name and status and leaves the plant in view; Details opens the rest.
 function sheetActions(v) {
   return h('div', { class: 'sheet-actions' },
     h('button', { type: 'button', class: 'sheet-more', 'data-key': 'sheet-more', 'aria-expanded': String(!!v.sheetOpen), 'aria-controls': 'inspector', onclick: () => { v.sheetOpen = !v.sheetOpen; updateInspector(); announce(v.sheetOpen ? 'Details shown.' : 'Details hidden.', 'polite', false); document.querySelector('[data-key="sheet-more"]')?.focus(); } }, v.sheetOpen ? 'Less' : 'Details'),
-    h('button', { type: 'button', class: 'sheet-close', 'data-key': 'sheet-close', 'aria-label': 'Close panel', onclick: () => { v.sel = null; updateInspector(); announce('Selection cleared.', 'polite', false); document.getElementById('floor-app')?.focus(); } }, 'Close'));
+    h('button', { type: 'button', class: 'sheet-close', 'data-key': 'sheet-close', 'aria-label': 'Close panel', onclick: () => { v.sel = null; v.infoOpen = false; updateInspector(); announce('Selection cleared.', 'polite', false); document.getElementById('floor-app')?.focus(); } }, 'Close'));
 }
 function inspector(st, v) {
   const o = v.sel ? st.floor.objects.find(o => o.id === v.sel) : null;
@@ -676,28 +778,40 @@ function checklist(st) {
     h('ol', { style: { margin: 0, paddingLeft: '1.3em', display: 'grid', gap: '4px' } }, steps.map(([ok, text, view]) => { const t = h('span', { class: ok ? 'good' : '' }, ok ? '✓ ' : '', text); return h('li', null, t, ok ? h('span', { class: 'sr-only' }, ' (done)') : view ? [' ', nameBy(h('button', { class: 'link', type: 'button', onclick: () => go(view) }, 'Go'), t)] : null); })));
 }
 
-function equipmentTable(st, v) {
+function equipmentTable(st, v, inDialog = false) {
   const rows = st.floor.objects.filter(o => !o.fixed && o.kind !== 'conveyor').map(o => ({ o, name: objectLabel(st, o), loc: `${o.x + 1}, ${o.y + 1}`, status: isProducer(o) ? (o.status || 'Idle') : o.kind === 'suite' ? `${st.employees.filter(e => e.assign === o.id).length} of ${analyseSuite(o).seats} desks in use` : o.kind === 'office' ? (st.employees.find(e => e.assign === o.id) ? fullName(st.employees.find(e => e.assign === o.id)) : 'Empty') : '—', value: o.value }));
   const belts = countKind(st.floor, 'conveyor');
-  return h('section', { class: 'card' }, h('h2', null, 'Equipment'), belts ? h('p', { class: 'muted' }, `Plus ${num(belts)} conveyor belt sections.`) : null,
+  return h(inDialog ? 'div' : 'section', { class: inDialog ? 'stack' : 'card' }, inDialog ? null : h('h2', null, 'Equipment'), belts ? h('p', { class: 'muted' }, `Plus ${num(belts)} conveyor belt sections.`) : null,
     table('Equipment on the floor', [
       { key: 'name', label: 'Item' }, { key: 'loc', label: 'Column, row' }, { key: 'status', label: 'Status / occupant' },
       { key: 'value', label: 'Value', num: true, render: r => money(r.value) },
-      { key: 'sel', label: '', sortable: false, render: r => h('button', { type: 'button', 'data-key': 'eq-' + r.o.id, onclick: () => selectObj(r.o) }, 'Select') }],
+      { key: 'sel', label: '', sortable: false, render: r => h('button', { type: 'button', 'data-key': 'eq-' + r.o.id, onclick: () => { if (inDialog) document.querySelector('dialog[open]')?.close(); selectObj(r.o); } }, 'Select') }],
     rows, { hideCaption: true, empty: 'Nothing bought yet. Open the Catalog to buy machines and offices.' }));
 }
 
 // ---------- drawing
+// the canvas is the size of the surface in device pixels, and the camera is kept inside its limits as the window changes
+function sizeCanvas() {
+  const el = surfaceEl; if (!el || !canvas) return;
+  const w = el.clientWidth || 1, h2 = el.clientHeight || 1, dpr = Math.min(3, window.devicePixelRatio || 1);
+  vp = { w, h: h2, dpr };
+  const cw = Math.round(w * dpr), ch = Math.round(h2 * dpr);
+  if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+  const v = vs(); if (v.zoom != null && curView) setCam(v, camOf(v));
+  syncLayout();
+  if (app.st?.floor && curView && colors) draw();      // a resize clears the canvas: paint it again at once
+}
 export function mounted() {
-  const fr = document.getElementById('floor-app'), v = vs();
-  if (fr) {
-    if (v.scrollX != null) { fr.scrollLeft = v.scrollX; fr.scrollTop = v.scrollY; }
-    if (v.centerGhost && curView) {   // on a touch screen a new item starts in the middle of what is on screen
-      v.centerGhost = false;
-      const vx = (fr.scrollLeft + fr.clientWidth / 2) / v.zoom, vy = (fr.scrollTop + fr.clientHeight / 2) / v.zoom, fl = app.st.floor;
-      const [tx, ty] = screenToTile(curView, vx, vy); v.cx = Math.max(0, Math.min(fl.w - 1, tx)); v.cy = Math.max(0, Math.min(fl.h - 1, ty));
-    }
+  const v = vs(), el = surfaceEl; if (!el) return;
+  ro?.disconnect(); ro = new ResizeObserver(sizeCanvas); ro.observe(el); const side = document.getElementById('inspector'); if (side) ro.observe(side);
+  const w = el.clientWidth || 1, h2 = el.clientHeight || 1; vp = { w, h: h2, dpr: Math.min(3, window.devicePixelRatio || 1) };
+  if (v.zoom == null || v.camX == null) initCamera(v); else setCam(v, camOf(v));
+  if (v.centerGhost && curView) {   // on a touch screen a new item starts in the middle of what is on screen
+    v.centerGhost = false;
+    const [sx, sy] = toScene(camOf(v), v.zoom, vp.w / 2, vp.h / 2), fl = app.st.floor;
+    const [tx, ty] = screenToTile(curView, sx, sy); v.cx = Math.max(0, Math.min(fl.w - 1, tx)); v.cy = Math.max(0, Math.min(fl.h - 1, ty));
   }
+  syncZoomUI(); sizeCanvas();
   cancelAnimationFrame(raf); const loop = () => { if (app.view !== 'floor' || !canvas?.isConnected) return; draw(); raf = requestAnimationFrame(loop); }; raf = requestAnimationFrame(loop); }
 export function patch() {
   // light refresh: inspector + checklist only; canvas animates itself
@@ -708,10 +822,18 @@ export function patch() {
 function readColors() {
   const cs = getComputedStyle(document.documentElement); const g = n => cs.getPropertyValue(n).trim();
   const bg = g('--bg'); const n = parseInt(bg.slice(1), 16); const lum = ((n >> 16 & 255) * 0.3 + (n >> 8 & 255) * 0.59 + (n & 255) * 0.11);
-  colors = { floor: g('--floor'), panel: g('--panel'), focus: g('--focus'), dark: lum < 110 };
+  colors = { floor: g('--floor'), panel: g('--panel'), focus: g('--focus'), ground: g('--panel'), dark: lum < 110 };
   colorsAt = performance.now();
 }
 let lo = null;
+// the one place the scene reaches the screen: the visible part of the scene, scaled by the camera, on the ground colour
+function present(lo, v) {
+  const c = canvas.getContext('2d'), dpr = vp.dpr, z = v.zoom, cx = v.camX || 0, cy = v.camY || 0;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = colors.ground; c.fillRect(0, 0, canvas.width, canvas.height);
+  const [sx, sy, sw, sh] = visible({ x: cx, y: cy }, z, sceneSize(), vp); if (!sw || !sh) return;
+  c.imageSmoothingEnabled = false;
+  c.drawImage(lo, sx, sy, sw, sh, Math.round((sx * z - cx) * dpr), Math.round((sy * z - cy) * dpr), Math.round(sw * z * dpr), Math.round(sh * z * dpr));
+}
 // draw times of the last 120 frames, read by the performance test through the test hook
 function draw() { const t0 = performance.now(); drawFrame(); belt.drawMs.push(performance.now() - t0); if (belt.drawMs.length > 120) belt.drawMs.shift(); }
 function drawFrame() {
@@ -726,11 +848,11 @@ function drawFrame() {
     // follow the builders: centre the view on whatever is being installed (unless the player is moving the cursor)
     { const n = st.move.order.length, i = Math.floor(Math.max(0, (G.moveProgress(st) - 0.08) / 0.86) * n);
       const cur = i < n ? st.move.floor.objects.find(x => x.id === st.move.order[i]) : st.move.floor.objects.find(x => x.kind === 'dock');
-      if (cur && cur.id !== followId && performance.now() - lastKeyNav > 4000) { followId = cur.id; const [cx, cy] = center(cur); v.cx = Math.round(cx); v.cy = Math.round(cy); const fr = document.getElementById('floor-app'); if (fr) { const [lx, ly] = tileXY(view, cx + 0.5, cy + 0.5); fr.scrollLeft = lx * v.zoom - fr.clientWidth / 2; fr.scrollTop = ly * v.zoom - fr.clientHeight / 2; } } }
+      if (cur && cur.id !== followId && performance.now() - lastKeyNav > 4000) { followId = cur.id; const [cx, cy] = center(cur); v.cx = Math.round(cx); v.cy = Math.round(cy); const [lx, ly] = tileXY(view, cx + 0.5, cy + 0.5); setCam(v, { x: lx * v.zoom - vp.w / 2, y: ly * v.zoom - vp.h / 2 }); } }
     const showCursor = document.activeElement?.id === 'floor-app';
     drawScene(lc, view, st, { C: colors, t: now, anim, pallets: 0, workers: crewSprites(st, anim), build: { p: G.moveProgress(st), order: st.move.order },
       cursor: showCursor && inBounds(st.move.floor, v.cx, v.cy) ? [v.cx, v.cy] : null });
-    const c = canvas.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(lo, 0, 0, canvas.width, canvas.height);
+    present(lo, v);
     return;
   }
   if (view.fl !== st.floor) { rerender({}); return; }
@@ -749,8 +871,7 @@ function drawFrame() {
     cursor: showCursor && inBounds(fl, v.cx, v.cy) ? [v.cx, v.cy] : null,
     gauges: o => o.mode === 'produce' && o.recipe != null ? machineSupply(st, o).inputs.map(i => ({ frac: Math.min(1, i.hours / COVER_SCALE), status: i.status })) : [],
   });
-  const c = canvas.getContext('2d'); c.imageSmoothingEnabled = false;
-  c.drawImage(lo, 0, 0, canvas.width, canvas.height);
+  present(lo, v);
 }
 // a building crew in hard hats around whatever is being installed at the new site
 const crew = [101, 102, 103, 104].map((id, i) => ({ id, job: ['operations_1', 'maintenance_1', 'operations_3', 'operations_1'][i], hat: true, px: null, py: null, tx: null, ty: null }));

@@ -47,7 +47,7 @@ Sprint 5 (Sam, 2026-10-09: "make the factory floor the whole window … touch ev
 
 | Spec | Item | Impact | Effort | Pillars | Status | Evidence |
 |---|---|---|---|---|---|---|
-| 015 | **Full-window floor:** one canvas filling the page with a camera, one pointer-event path for touch, pen and mouse, and the controls floating over it. | 5 | L | 1, 4 | specced | Sam |
+| 015 | **Full-window floor:** one canvas filling the page with a camera, one pointer-event path for touch, pen and mouse, and the controls floating over it. | 5 | L | 1, 4 | review | Sam |
 
 Sprint 6 (planned, moved from 5): the page-and-swipe pattern and every section split into pages that fit 390 × 844,
 360 × 740 and landscape (F-1, F-3, F-4, F-5).

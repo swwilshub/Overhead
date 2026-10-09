@@ -51,7 +51,8 @@ and gets out of the way.
 7. **Accessibility is unchanged.** The floor is still one focusable `application` region with the same keyboard model and
    spoken descriptions; the page has an `h1` ("Factory floor"); the equipment list and Needs attention stay reachable by
    keyboard and screen reader; focus stays on the floor after acting on it, as before.
-8. **Nothing gets slower.** A frame draws only the part of the plant in view; the floor frame stays within its budget.
+8. **Nothing gets slower.** Each frame puts only the part of the plant in view onto the screen (the picture of the whole plant is still
+   composed at one pixel per game pixel each frame, as before); the floor frame stays within its budget.
 
 ## Out of scope
 

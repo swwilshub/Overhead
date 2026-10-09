@@ -134,15 +134,40 @@ dialog .dlg-actions { display: flex; flex-wrap: wrap; justify-content: flex-end;
 .toast.assertive { background: var(--hazard); color: var(--hazard-ink) }
 
 /* floor */
-.floor-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start }
-.floor-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px }
-.floor-frame { position: relative; overflow: auto; width: max-content; max-width: 100%; border: 2px solid var(--wall); border-radius: 8px; background: var(--floor); max-height: 70vh; }
-.floor-frame:focus-within { outline: 3px solid var(--focus); outline-offset: 2px }
-.floor-frame canvas { display: block; touch-action: none }
 .floor-help { font-size: var(--step--1); color: var(--muted) }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--muted) }
 .legend span { display: inline-flex; align-items: center; gap: 6px }
 .legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid var(--line) }
+/* the factory floor is the whole content area (spec 015): one canvas, with the controls floating over it */
+main.floor-main { padding: 0; overflow: hidden }
+#live-polite, #live-assertive { position: fixed; top: 0; left: 0 }   /* off-screen text must not make the page taller */
+html:has(main.floor-main), body:has(main.floor-main) { overflow: hidden; overscroll-behavior: none }   /* the page never scrolls or pulls to refresh under the floor */
+.floor-stage { position: absolute; inset: 0; --sheet-h: 0px; overflow: hidden; background: var(--bg) }
+.floor-surface { position: absolute; inset: 0; touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: default; -webkit-tap-highlight-color: transparent }
+.floor-surface.panning { cursor: grabbing }
+.floor-surface:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px }
+.floor-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none }
+.floor-hud { position: absolute; inset: 0; pointer-events: none; z-index: 2 }
+.floor-hud > *, .floor-hud .hud-left > * { pointer-events: auto }
+.floor-hud .hud-left { pointer-events: none }
+.hud-left { position: absolute; left: 12px; top: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100% - 24px - 332px) }
+.floor-tools, .site-tabs, .needs-card, .hud-chip, .hud-zoom, .hud-buttons, .place-bar { background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 2px 10px rgb(0 0 0 / 0.18); backdrop-filter: blur(4px) }
+.floor-tools { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; align-items: center }
+.site-tabs { display: flex; gap: 4px; flex-wrap: wrap; padding: 4px }
+.needs-card { margin: 0; max-width: 460px; max-height: 40vh; overflow: auto; border-left: 6px solid var(--hazard) }
+.needs-card summary { cursor: pointer; padding: 2px 0 }
+.hud-panel { position: absolute; right: 12px; top: 12px; bottom: calc(12px + 56px); width: 320px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; padding: 8px; background: color-mix(in srgb, var(--bg) 94%, transparent); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 2px 14px rgb(0 0 0 / 0.22); backdrop-filter: blur(4px) }
+.hud-panel.away { display: none }
+.hud-bottom { position: absolute; left: 12px; right: 12px; bottom: calc(12px + var(--sheet-h)); display: flex; flex-direction: column; align-items: flex-start; gap: 8px }
+.hud-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; max-width: calc(100% - 332px) }
+.hud-chip { margin: 0; padding: 6px 10px; font-size: 0.85rem; color: var(--muted) }
+.hud-buttons { gap: 6px; padding: 4px }
+.hud-zoom { position: absolute; right: 12px; top: 12px; padding: 4px }
+.hud-zoom .zoom-group { flex-direction: column } .hud-zoom .zoom-num { display: none }
+.place-bar { position: static; width: 100%; max-width: 640px; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; align-self: center; box-shadow: 0 -4px 16px rgb(0 0 0 / 0.2) }
+.place-what { font-weight: 700 }
+.place-bar button { min-height: 48px; min-width: 88px }
+.zoom-group { display: inline-flex; align-items: center; gap: 6px }
 
 /* city */
 .city-grid { display: grid; gap: 3px; background: var(--bar); padding: 3px; border-radius: 8px; width: max-content }
@@ -321,7 +346,6 @@ dialog .dlg-actions { display: flex; flex-wrap: wrap; justify-content: flex-end;
   nav.rail a { white-space: nowrap; padding: 6px 10px }
   main { padding-inline: 16px }
   .toasts .toast:nth-last-child(n+3) { display: none }
-  .floor-layout { grid-template-columns: 1fr }
   .status { padding-inline: 16px } .status .run { margin-left: 0 }
 }
 /* phones (specs 007 to 009): a slim top bar, a bottom bar and a Menu sheet */
@@ -359,10 +383,14 @@ dialog.menu-sheet .dlg { position: relative; gap: 10px; padding: 16px 16px calc(
   main { grid-row: 1 } .tabbar { grid-row: 2; border-top: 1px solid var(--line); background: var(--panel-2); padding-bottom: env(safe-area-inset-bottom, 0px) }
 }
 /* touch (spec 006): the floor's own gestures, a placement bar, and finger-sized floor buttons */
-.place-bar { position: sticky; bottom: calc(-1 * var(--pad-b)); z-index: 6; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 -4px 16px rgb(0 0 0 / 0.2) }
-.place-what { font-weight: 700 }
-.place-bar button { min-height: 48px; min-width: 88px }
-.zoom-group { display: inline-flex; align-items: center; gap: 6px }
+/* a landscape phone has width and no height: the tools stand in a column at the left, the zoom buttons join the bottom row */
+@media (max-height: 500px) {
+  .hud-chip { display: none }
+  .hud-left { top: 8px; left: 8px; max-width: none }
+  .floor-tools { flex-direction: column; flex-wrap: nowrap; overflow: visible; max-width: none; align-items: stretch } .floor-tools > * { width: 100% }
+  .hud-zoom { top: auto; bottom: 8px; right: 8px } .hud-zoom .zoom-group { flex-direction: row }
+  .hud-bottom { left: 190px; bottom: calc(8px + var(--sheet-h)); max-width: calc(100% - 190px - 190px) }
+}
 @media (pointer: coarse) { .floor-tools button, .floor-tools select { min-height: 44px; min-width: 44px } }
 @media (max-width: 700px), (max-height: 500px) {
   /* dialogs are sheets at the bottom of the screen, buttons full width (spec 008) */
@@ -370,18 +398,18 @@ dialog.menu-sheet .dlg { position: relative; gap: 10px; padding: 16px 16px calc(
   dialog .dlg { padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; max-height: 85vh; max-height: 85dvh; overscroll-behavior: contain }
   dialog .dlg-actions { flex-direction: column; align-items: stretch }
   dialog .dlg-actions button { min-height: 48px; width: 100% }
-  /* the selected item's panel is a sheet over the floor; with nothing selected it stays under it */
-  #inspector.sheet { position: sticky; bottom: calc(-1 * var(--pad-b)); z-index: 6; max-height: 50vh; max-height: min(50dvh, 420px); overflow-y: auto; overscroll-behavior: contain; margin-inline: -12px; padding: 10px 12px 12px; background: var(--bg); border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgb(0 0 0 / 0.25) }
+  /* the selected item's panel is a sheet over the bottom of the floor; with nothing selected it is hidden until the Checklist button opens it */
+  .hud-left { max-width: calc(100% - 24px - 60px) } .hud-info { max-width: 100% } .floor-tools { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none } .floor-tools::-webkit-scrollbar { display: none } .floor-tools > * { flex: none }
+  .hud-panel { position: absolute; left: 0; right: 0; bottom: 0; top: auto; width: auto; max-height: min(50dvh, 420px); border-radius: 16px 16px 0 0; border-width: 1px 0 0; box-shadow: 0 -4px 16px rgb(0 0 0 / 0.25); padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--bg) }
+  .hud-bottom { left: 8px; right: 8px }
+  .hud-info { max-width: 100% } .hud-chip { max-width: 100% }
   #inspector.sheet .card { border: 0; padding: 4px 0; gap: 6px }
   #inspector .sheet-actions { display: flex; justify-content: flex-end; gap: 8px }
   #inspector .sheet-actions button { min-height: 44px; min-width: 76px }
   /* collapsed: name, the buttons and the status line only */
   #inspector.sheet:not(.open) .card > :not(h2):not(.sheet-actions):not(p:first-of-type) { display: none }
-  /* the floor page gives its height to the plant: the address line stays for screen readers only */
-  .floor-page h1 { font-size: var(--step-2) }
   .dept-line ul { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px !important } .dept-line ul::-webkit-scrollbar { display: none } .dept-line li { flex: none; white-space: nowrap }
   .staff-page .view-head { flex-wrap: nowrap; align-items: center; margin-bottom: 8px } .staff-page .view-head p { font-size: 0.85rem } .staff-page .view-head button { flex: none }
-  .floor-page .view-head p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
   /* toasts sit under the top bar and never hide the bottom bar or the thumbs */
   .toasts { top: calc(env(safe-area-inset-top, 0px) + 100px); bottom: auto; left: 12px; right: 12px; max-width: none }
 }

@@ -105,12 +105,10 @@ async def main():
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
         # ---- the selected item's panel is a sheet
         async def tile_xy(tx, ty):
-            r = await box(pg, '#floor-app canvas'); z = await pg.evaluate("() => window.__overhead.app.viewState.floor.zoom")
-            return r['x'] + (6 + tx * 16 + 8) * z, r['y'] + (28 + ty * 16 + 8) * z
+            return await pg.evaluate("([x, y]) => window.__overhead.floorPoint(x, y)", [tx, ty])
         mc = await pg.evaluate("() => { const o = window.__overhead.app.st.floor.objects.find(o => o.kind === 'machine'); return [Math.round(o.x), Math.round(o.y)]; }")
         ok(not await pg.evaluate("() => document.getElementById('inspector').classList.contains('sheet')"), 'with nothing selected the panel is not a sheet')
         async def tap_machine():
-            await pg.evaluate("() => document.getElementById('floor-app').scrollIntoView({block: 'start'})")
             x, y = await tile_xy(mc[0], mc[1]); await pg.touchscreen.tap(x, y); await pg.wait_for_timeout(450)
         await tap_machine()
         sh = await box(pg, '#inspector.sheet')
@@ -140,8 +138,7 @@ async def main():
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
         ok(await pg.locator('#inspector.sheet').count() == 0, 'Escape closes the sheet')
         await tap_machine()
-        await pg.evaluate("() => document.getElementById('floor-app').scrollIntoView({block: 'start'})")
-        ex, ey = await tile_xy(1, 1); await pg.touchscreen.tap(ex, ey); await pg.wait_for_timeout(400)   # an empty square near the top, clear of the sheet
+        et = await pg.evaluate("() => window.__overhead.emptyTile()"); ex, ey = await tile_xy(*et); await pg.touchscreen.tap(ex, ey); await pg.wait_for_timeout(400)   # an empty square, clear of the sheet and the controls
         ok(await pg.locator('#inspector.sheet').count() == 0, 'tapping an empty square closes the sheet')
         # the i key still reaches the panel, and opens it
         await tap_machine(); await pg.focus('#floor-app'); await pg.keyboard.press('i'); await pg.wait_for_timeout(300)
