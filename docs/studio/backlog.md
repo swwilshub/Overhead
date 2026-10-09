@@ -43,7 +43,13 @@ The one-screen work is sprint 4.
 | 012 | **Profile cards:** one card per person with the three-dot line, in a carousel; a reusable carousel. | 4 | M | 1, 4 | review | Sam; F-3 |
 | 013 | **Balance for seniority:** pay, skill and experience numbers that keep the 24-month bands. | 4 | S | 3 | review | economy |
 
-Sprint 5 (planned, moved from 4): the page-and-swipe pattern and every section split into pages that fit 390 × 844,
+Sprint 5 (Sam, 2026-10-09: "make the factory floor the whole window … touch events done properly … pull all the graphics into that context"): spec 015.
+
+| Spec | Item | Impact | Effort | Pillars | Status | Evidence |
+|---|---|---|---|---|---|---|
+| 015 | **Full-window floor:** one canvas filling the page with a camera, one pointer-event path for touch, pen and mouse, and the controls floating over it. | 5 | L | 1, 4 | specced | Sam |
+
+Sprint 6 (planned, moved from 5): the page-and-swipe pattern and every section split into pages that fit 390 × 844,
 360 × 740 and landscape (F-1, F-3, F-4, F-5).
 
 ## Sprint 4 (Sam, 2026-10-09: "remove all manual text entry unless it's really needed … numbers first")
