@@ -138,6 +138,55 @@ dialog .dlg-actions { display: flex; flex-wrap: wrap; justify-content: flex-end;
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--muted) }
 .legend span { display: inline-flex; align-items: center; gap: 6px }
 .legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid var(--line) }
+/* pages that each fit the screen on a phone (spec 016) */
+main.pager-main { padding: 0; overflow: hidden; position: relative }
+.pager { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg) }
+.pager-tabs { flex: none; display: flex; gap: 4px; padding: 6px 8px 0; overflow-x: auto; scrollbar-width: none; border-bottom: 2px solid var(--line) }
+.pager-tabs::-webkit-scrollbar { display: none }
+.pager.solo .pager-tabs { display: none }
+.pager-tabs [role=tab] { flex: 1 1 0; min-width: max-content; min-height: 46px; padding: 4px 12px; border-radius: 10px 10px 0 0; border: 1px solid var(--line); border-bottom: 0; background: var(--panel-2); margin-bottom: -2px; font-weight: 700 }
+.pager-tabs [role=tab][aria-selected=true] { background: var(--panel); border-color: var(--accent); border-bottom: 2px solid var(--panel); color: var(--accent) }
+.pager-tabs .badge { margin-left: 6px; background: var(--hazard); color: var(--hazard-ink); border-radius: 999px; padding: 0 8px; font-size: 0.8rem; font-family: var(--font-mono) }
+.pager-main { flex: 1; min-height: 0; display: flex; flex-direction: column }
+.pager-view { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: pan-y; background: var(--bg) }
+.pager-view.pending { visibility: hidden }
+.pg-group { position: absolute; inset: 0; padding: 10px 12px; box-sizing: border-box; overflow: hidden }
+.pg-group[hidden] { display: none }
+.pg-group.overflowing { overflow-y: auto }
+.pg-head { margin-bottom: 10px }
+.pg-body { display: block }
+.pg-body > * { margin: 0 0 10px }
+.pg-body > .table-wrap { margin: 0 }
+.pg-body [hidden] { display: none !important }
+.pg-body > .table-wrap tr { margin-bottom: 10px }
+.pager-bar { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; padding: 6px 12px; border-top: 1px solid var(--line); background: var(--panel-2) }
+.pager-bar.single { display: none }
+.pager-btn { min-height: 48px; font-weight: 700; font-size: 1.05rem }
+.pager-count { min-width: 5em; text-align: center; font-weight: 700 }
+@keyframes pg-in-l { from { transform: translateX(28px); opacity: 0.2 } to { transform: none; opacity: 1 } }
+@keyframes pg-in-r { from { transform: translateX(-28px); opacity: 0.2 } to { transform: none; opacity: 1 } }
+.pg-group.slide-l { animation: pg-in-l 0.16s ease-out } .pg-group.slide-r { animation: pg-in-r 0.16s ease-out }
+/* a landscape phone has width and no height: a few tabs stand in a column at the left */
+@media (max-height: 500px) {
+  .pager:not(.many) { flex-direction: row }
+  .pager:not(.many) .pager-tabs { flex-direction: column; width: 132px; overflow: visible; border-bottom: 0; border-right: 2px solid var(--line); padding: 8px 6px; gap: 6px }
+  .pager:not(.many) .pager-tabs [role=tab] { flex: none; min-width: 0; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); margin: 0; padding: 4px 8px; text-align: left }
+  .pager:not(.many) .pager-tabs [role=tab][aria-selected=true] { border-color: var(--accent); background: var(--panel) }
+  /* the arrows move to the left and right edges of the page, where the thumbs are, and the count sits along the bottom */
+  .pager-main { position: relative }
+  .pager-bar { position: absolute; inset: 0; display: block; padding: 0; border: 0; background: none; pointer-events: none }
+  .pager-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; min-width: 48px; height: 96px; padding: 0; font-size: 0; pointer-events: auto; border-radius: 12px; background: color-mix(in srgb, var(--panel) 92%, transparent) }
+  .pager-btn [aria-hidden] { font-size: 2rem; line-height: 1 }
+  .pager-btn[data-key="pg-prev"] { left: 6px } .pager-btn[data-key="pg-next"] { right: 6px }
+  .pager-count { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); pointer-events: none; min-width: 0; padding: 0 10px; font-size: 0.85rem; border-radius: 999px; background: color-mix(in srgb, var(--panel) 90%, transparent) }
+  .pager-tabs [role=tab] { min-height: 40px }
+  .pg-body .pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 16px; align-items: start }
+  .stepper:not(.compact) { grid-template-columns: auto minmax(8em, 1fr); align-items: center; gap: 4px 12px } .stepper:not(.compact) > .stepper-chips, .stepper:not(.compact) > .stepper-note, .stepper:not(.compact) > .stepper-main:only-child { grid-column: 1 / -1 }
+  .stepper-main { grid-template-columns: auto auto; align-items: center } .stepper-value { min-width: 7ch; font-size: 1.2rem } .stepper-btn { min-width: 0; padding: 0 10px }
+  .stepper-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none } .chip { flex: none }
+  .pg-group { padding: 4px 62px 26px } .pager-tabs { padding-top: 4px } .pg-body .cat-item { padding: 8px 10px }
+  .pg-body .chart-fig { gap: 2px } .pg-body .chart-fig figcaption h3 { font-size: 1rem } .pg-body .chart-readout { min-height: 0 } .pg-body .chart-legend { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none }
+}
 /* the factory floor is the whole content area (spec 015): one canvas, with the controls floating over it */
 main.floor-main { padding: 0; overflow: hidden }
 #live-polite, #live-assertive { position: fixed; top: 0; left: 0 }   /* off-screen text must not make the page taller */
@@ -404,6 +453,31 @@ dialog.menu-sheet .dlg { position: relative; gap: 10px; padding: 16px 16px calc(
   .hud-bottom { left: 8px; right: 8px }
   .hud-info { max-width: 100% } .hud-chip { max-width: 100% }
   #inspector.sheet .card { border: 0; padding: 4px 0; gap: 6px }
+  /* Details open: a taller sheet whose body is a pager (pagedCard in floor.js) */
+  #inspector.sheet.open:has(.sheet-pager) { height: min(78dvh, 640px); max-height: none; display: flex; flex-direction: column; overflow: hidden }
+  #inspector .sheet-card { flex: 1; min-height: 0; display: flex; flex-direction: column }
+  #inspector .sheet-pager { flex: 1; min-height: 0; position: relative }
+  #inspector .sheet-pager .pager { background: transparent } #inspector .sheet-pager .pager-view { background: transparent }
+  #inspector .sheet-pager .pg-group { padding: 6px 2px }
+  .pg-body [data-split] > * { margin: 0 0 8px }
+  #inspector.sheet.open:has(.cell-panel) { height: min(64dvh, 540px); max-height: none; display: flex; flex-direction: column; overflow: hidden }
+  #inspector .cell-panel.sheet-card > .row { flex: none }
+  /* on its side the paged panel is a column down the right edge, so the floor stays in view beside it, and its Previous/Next sit under the page */
+  @media (max-height: 500px) {
+    #inspector.sheet:has(.sheet-pager) { left: auto; right: 0; top: 0; bottom: 0; width: min(60vw, 520px); height: auto !important; border-radius: 16px 0 0 16px; border-width: 0 0 0 1px }
+    #inspector .sheet-pager .pager-bar { position: static; display: grid; grid-template-columns: 1fr auto 1fr; padding: 4px 0 0; border-top: 1px solid var(--line); pointer-events: auto; background: none }
+    #inspector .sheet-pager .pager-btn { position: static; transform: none; width: auto; min-width: 0; height: auto; min-height: 44px; font-size: 1rem; padding: 0 12px }
+    #inspector .sheet-pager .pager-btn [aria-hidden] { font-size: inherit }
+    #inspector .sheet-pager .pager-count { position: static; transform: none; font-size: 0.9rem; background: none }
+    #inspector .sheet-pager .pg-group, #inspector .sheet-pager .pager-main .pg-group { padding: 4px 2px }
+    #inspector.sheet:has(.sheet-pager) { padding-top: 4px; padding-bottom: 4px } #inspector .sheet-pager .pager-bar { padding-top: 2px }
+    #inspector .sheet-head { display: flex; align-items: center; gap: 8px } #inspector .sheet-head h2 { flex: none; font-size: 1.1rem; margin: 0 } #inspector .sheet-head > p { flex: 1; min-width: 0; margin: 0; order: 2 } #inspector .sheet-head .sheet-actions { order: 3 }
+    #inspector .sheet-pager .cell-list { grid-template-columns: 1fr 1fr } #inspector .sheet-pager .cell-list li { min-width: 0 }
+    #inspector .cell-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap } #inspector .cell-head h2 { font-size: 1.1rem } #inspector .cell-head .cell-steps { margin: 0 }
+    #inspector .cell-panel.sheet-card > .row { flex-wrap: nowrap } #inspector .cell-panel.sheet-card > .row button { min-height: 44px; padding: 0 10px }
+    .floor-stage:has(#inspector.sheet:has(.sheet-pager)) .hud-zoom { right: calc(min(60vw, 520px) + 8px) }
+    .floor-stage:has(#inspector.sheet:has(.sheet-pager)) .hud-bottom { max-width: calc(100% - 190px - min(60vw, 520px) - 8px) }
+  }
   #inspector .sheet-actions { display: flex; justify-content: flex-end; gap: 8px }
   #inspector .sheet-actions button { min-height: 44px; min-width: 76px }
   /* collapsed: name, the buttons and the status line only */
@@ -424,6 +498,49 @@ dialog.menu-sheet .dlg { position: relative; gap: 10px; padding: 16px 16px calc(
   .table-wrap td[data-label=""]::before { content: none }
   .table-wrap th[scope="row"] { justify-content: flex-start; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-weight: 800; text-align: left }
   .table-wrap td[colspan] { display: block; text-align: left }
+  /* inside a pager page a row is a small grid of labelled values, so a page holds several rows and a wide phone shows more columns */
+  .pg-body > .table-wrap tr { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5em, 1fr)); gap: 0 12px; padding: 6px 10px }
+  .pg-body > .table-wrap th[scope="row"] { grid-column: 1 / -1; padding: 0 0 4px; margin-bottom: 4px }
+  .pg-body > .table-wrap td { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 0; padding: 2px 0; text-align: left }
+  .pg-body > .table-wrap td::before { max-width: none; font-size: 0.68rem }
+  .pg-body > .table-wrap td[colspan] { grid-column: 1 / -1 }
+  .pg-body > .table-wrap td[data-label=""] { grid-column: span 2; flex-direction: row; justify-content: flex-end; align-self: end }
+  .pg-body > .table-wrap td:has(.stepper) { grid-column: span 2 }
+  .pg-body .memo-list { list-style: none; margin: 0; padding: 0 }
+  .pg-body .memo-list li { margin: 0 0 8px }
+  .memo-btn { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; text-align: left; font-weight: 400; background: var(--panel); min-height: 52px }
+  .memo-btn.unread { font-weight: 700 } .memo-btn[aria-current=true] { background: var(--accent-soft) }
+  .memo-date { font-size: 0.8rem; flex: none }
+  .pg-body > .profile-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px }
+  .pg-h2 { font-size: var(--step-1); margin: 0 }
+  /* a dialog whose body is a pager: a sheet of fixed height, the pages between its title and its buttons */
+  dialog.paged { height: 88vh; height: 88dvh; max-height: none }
+  dialog.paged .dlg { display: flex; flex-direction: column; height: 100%; max-height: none; overflow: hidden }
+  dialog.paged .dlg > h2 { flex: none; font-size: var(--step-1); margin: 0 }
+  .dlg-pager { position: relative; flex: 1; min-height: 0 }
+  .pg-body .move-fig canvas { max-width: 100%; height: auto; max-height: 34dvh; object-fit: contain }
+  @media (max-height: 500px) { dialog.paged .dlg { padding: 6px 14px; gap: 4px } dialog.paged .stepper-hint, dialog.paged .pg-body .stepper-hint { display: none } dialog.paged { height: 96dvh } dialog.paged .dlg-actions { flex-direction: row } dialog.paged .dlg-actions button { width: auto; flex: 1; min-height: 44px } .pg-body .move-fig canvas { max-height: 90px } .pg-body .move-fig figcaption { display: none } }
+  dialog.paged .dlg-actions { flex: none }
+  .pg-body .pair { display: grid; gap: 10px }
+  .pg-body .dept-line ul { flex-wrap: wrap; overflow: visible } .pg-body .dept-line li { white-space: normal }
+  .pg-body .stepper-chips, dialog.paged .stepper-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none } .pg-body .chip, dialog.paged .chip { flex: none }
+  .cat-head { flex-wrap: nowrap; align-items: center } .cat-head .range-sprite { flex: none; width: 96px; height: auto; image-rendering: pixelated } .pg-body .cat-item { margin: 0 0 10px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel) }
+  .city-pane { display: flex; flex-direction: column; gap: 8px; height: calc(var(--pg-avail, 310px) - 10px); min-height: 0 }
+  .city-scroll { flex: 1; min-height: 0; overflow: auto; border-radius: 8px; overscroll-behavior: contain; touch-action: pan-x pan-y }
+  .city-pane .legend { flex: none; font-size: 0.75rem; gap: 2px 10px }
+  /* a two-column statement (a profit and loss, the keys) stays a plain list of lines inside a page */
+  .pg-body > .table-wrap.plain tr { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; background: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 5px 2px; margin: 0 }
+  .pg-body > .table-wrap.plain th[scope="row"], .pg-body > .table-wrap.plain td { display: block; border: 0; padding: 0; margin: 0; text-align: left; flex: 0 1 auto }
+  .pg-body > .table-wrap.plain td { text-align: right }
+  .pg-body > .table-wrap.plain td::before { content: none }
+  .pg-body svg { max-height: min(42dvh, 300px); max-width: 100% }
+  .pg-body .nation-map svg { max-height: min(46dvh, 340px) }
+  @media (max-height: 500px) { .pg-body svg { max-height: 70px }
+    .pg-body .nation-map svg { max-height: 150px }
+    .pg-body > .profile-card { grid-template-columns: 1fr 1fr; gap: 4px 16px; align-items: start; padding: 8px 12px }
+    .pg-body > .profile-card > header, .pg-body > .profile-card > .profile-level, .pg-body > .profile-card > .profile-pay, .pg-body > .profile-card > .row { grid-column: 1 }
+    .pg-body > .profile-card > .profile-stats, .pg-body > .profile-card > .kv { grid-column: 2 }
+    .pg-body > .profile-card > .profile-stats { grid-row: 1 / span 2 } .pg-body > .profile-card > .kv { grid-row: 3 / span 2 } }
   .sort-menu { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-weight: 700 }
   .sort-menu select { flex: 1 1 200px }
   .nation svg { max-height: none }

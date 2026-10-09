@@ -69,6 +69,7 @@ export function dialog(title, body, actions = [], opts = {}) {
     if (opts.backdrop) dlg.addEventListener('click', e => { if (e.target === dlg) close(null); }); // a tap on the dimmed screen
     document.body.append(dlg);
     dlg.showModal();
+    for (const p of dlg.querySelectorAll('.pager')) { p.__layout?.(); p.__observe?.(); }   // a paged body measures itself once it is on the screen
     const first = dlg.querySelector('[autofocus]') || dlg.querySelector('input,select,textarea') || acts.find(b => b.classList.contains('primary')) || acts[0];
     first?.focus();
   });
@@ -172,6 +173,7 @@ export function nameBy(ctrl, ...labels) {
 // A button in a row (outside its first cell) is named by its own text and then the first cell, or the elements in the
 // row marked data-rowname: "Select, Extrusion line machine #5".
 export function table(caption, cols, rows, opts = {}) {
+  if (isCompact()) cols = cols.filter(c => c.phone !== false);   // a phone's card shows the columns that matter
   const st = opts.sortState || { key: opts.defaultSort, dir: opts.defaultDir || 1 };
   const sorted = [...rows];
   const col = cols.find(c => c.key === st.key);
@@ -201,8 +203,10 @@ export function table(caption, cols, rows, opts = {}) {
     h('select', { 'data-key': 'sort-menu', onchange: e => { const [key, dir] = e.target.value.split(':'); opts.onSort({ key, dir: +dir }); } },
       sortCols.flatMap(c => [[c, c.num ? -1 : 1], [c, c.num ? 1 : -1]]).map(([c, d]) => h('option', { value: `${c.key}:${d}`, selected: st.key === c.key && st.dir === d },
         `${c.label}, ${c.num ? (d > 0 ? 'low to high' : 'high to low') : (d > 0 ? 'A to Z' : 'Z to A')}`)))) : null;
-  return h('div', { class: 'table-wrap', tabindex: opts.scrollable ? 0 : null, role: opts.scrollable ? 'region' : null, 'aria-label': opts.scrollable ? caption : null },
-    menu, h('table', cards ? { role: 'table' } : null, caption ? h('caption', { class: opts.hideCaption ? 'sr-only' : '' }, caption) : null, thead, tbody));
+  const wrap = h('div', { class: opts.plain ? 'table-wrap plain' : 'table-wrap', tabindex: opts.scrollable ? 0 : null, role: opts.scrollable ? 'region' : null, 'aria-label': opts.scrollable ? caption : null },
+    opts.noMenu ? null : menu, h('table', cards ? { role: 'table' } : null, caption ? h('caption', { class: opts.hideCaption ? 'sr-only' : '' }, caption) : null, thead, tbody));
+  wrap.sortMenu = menu;   // a pager puts the Sort by menu above every page
+  return wrap;
 }
 
 export function meter(v, label) {
@@ -211,6 +215,8 @@ export function meter(v, label) {
 }
 export const pill = (text, kind = 'mute', icon = '') => h('span', { class: 'pill ' + kind }, icon ? h('span', { 'aria-hidden': 'true' }, icon) : null, text);
 export const kv = pairs => h('dl', { class: 'kv' }, pairs.filter(Boolean).map(([k, v]) => [h('dt', null, k), h('dd', null, v)]));
+// the same pairs as one list, or on a phone as short lists of `n`, so a pager can put them on separate pages
+export const kvParts = (pairs, n = 4) => { const ps = pairs.filter(Boolean); if (!isCompact() || ps.length <= n) return [kv(ps)]; const out = []; for (let i = 0; i < ps.length; i += n) out.push(kv(ps.slice(i, i + n))); return out; };
 export function field(label, input, hint) {
   const id = input.id || ('f' + Math.random().toString(36).slice(2, 8)); input.id = id;
   const hid = hint ? id + '-hint' : null; if (hid) input.setAttribute('aria-describedby', hid);

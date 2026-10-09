@@ -62,7 +62,7 @@ async def main():
         await pg.set_viewport_size({'width': 390, 'height': 900}); await pg.wait_for_timeout(400)
         sw = await pg.evaluate("() => document.documentElement.scrollWidth")
         ok(sw <= 390, f'no horizontal scroll at phone width ({sw})')
-        await pg.locator('#cat-panel').screenshot(path=SHOT + 'cat_phone.png')
+        await pg.locator('#main').screenshot(path=SHOT + 'cat_phone.png')
         ok(not errs, f'no page errors {errs[:3]}')
         await b.close()
     print(f'{fails} FAILED' if fails else 'all catalog checks pass')

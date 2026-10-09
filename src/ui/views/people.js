@@ -1,9 +1,10 @@
 import { h, table, kv, announce, dialog, confirmBox, pill, meter, field, tabs, ladderDots, levelLine, carousel, stepper } from '../dom.js';
-import { app, go, render as rerender, act } from '../app.js';
+import { app, go, render as rerender, act, isCompact } from '../app.js';
 import * as G from '../../sim/game.js';
 import { JOBS, JOB_LIST, AD_TARGETS, ladder, LEVEL_NAME, levelOf, deptName, hasRole, ATTR_GROUPS, ATTRS, NEGATIVE_ATTRS } from '../../core/content.js';
 import { ECONOMY } from '../../gen/data.js';
 const RAISE = () => Math.round(ECONOMY.walkoutRaise * 100);
+import { pager, pagerState, pagedDialog } from '../pager.js';
 import { fullName, skill, payRatio, marketSalary, jobFit, activityAt, ACT_LABEL, isWhite, levelProgress } from '../../sim/people.js';
 import { objectLabel } from '../../sim/floor.js';
 import { money, num, pct, fmtDate, fmtShortDate, minuteOfDay, MIN_PER_DAY } from '../../core/util.js';
@@ -19,6 +20,7 @@ const workplace = (st, e) => e.assign ? objectLabel(st, st.floor.objects.find(o 
 const DEPT_ORDER = [...new Set(AD_TARGETS.map(t => t.dept))];
 
 export const staff = {
+  paged: true,
   live: true,
   render() {
     const st = app.st, v = (app.viewState.staff ||= { dept: 'all', car: {} });
@@ -28,6 +30,15 @@ export const staff = {
       .sort((a, b) => DEPT_ORDER.indexOf(JOBS[a.job].dept) - DEPT_ORDER.indexOf(JOBS[b.job].dept) || levelOf(b) - levelOf(a) || fullName(a).localeCompare(fullName(b)));
     const payroll = st.employees.reduce((s, e) => s + e.salary, 0);
     const label = d => { const n = st.employees.filter(e => d === 'all' || JOBS[e.job].dept === d).length; return `${d === 'all' ? 'All' : deptName(d)} (${n})`; };
+    if (isCompact()) {
+      // a phone: an Overview page, then a tab for each department, each person a card on a page of their own
+      const byDept = d => st.employees.filter(e => JOBS[e.job].dept === d).sort((a, b) => levelOf(b) - levelOf(a) || fullName(a).localeCompare(fullName(b)));
+      const strike = st.strike ? h('div', { class: 'notice', role: 'alert' }, h('p', null, h('strong', null, 'The floor crew has walked out. '), `They want a ${RAISE()}% raise, and no machine runs until it's settled.`), h('button', { type: 'button', class: 'primary', style: { marginTop: '8px' }, onclick: async () => { if (await confirmBox('End the walkout?', `Give everyone on the floor a ${RAISE()}% raise?`, 'Give the raise')) act(G.settleStrike(st)); } }, `Give the ${RAISE()}% raise`)) : null;
+      return pager({ title: 'Staff', name: 'Staff pages', state: pagerState('staff'), groups: [
+        { key: 'overview', label: 'Overview', blocks: [strike, h('p', null, `${num(st.employees.length)} employees · payroll ${money(payroll)} a year, paid every other Friday.`), deptSummary(st), h('div', { class: 'row' }, h('button', { type: 'button', class: 'primary', onclick: () => go('hire') }, 'Hire people')),
+          st.employees.length ? null : h('p', { class: 'empty' }, 'No employees yet. Place a help-wanted ad on the Hiring page.')].filter(Boolean) },
+        ...present.map(d => ({ key: d, label: deptName(d), badge: byDept(d).length, blocks: byDept(d).map(e => profileCard(st, e)) }))] });
+    }
     return h('div', { class: 'stack staff-page' },
       h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Staff'), h('p', null, `${num(st.employees.length)} employees · payroll ${money(payroll)} a year, paid every other Friday.`)), h('button', { type: 'button', class: 'primary', onclick: () => go('hire') }, 'Hire people')),
       st.strike ? h('div', { class: 'notice', role: 'alert' }, h('p', null, h('strong', null, 'The floor crew has walked out. '), `They want a ${RAISE()}% raise, and no machine runs until it's settled.`), h('button', { type: 'button', class: 'primary', style: { marginTop: '8px' }, onclick: async () => { if (await confirmBox('End the walkout?', `Give everyone on the floor a ${RAISE()}% raise?`, 'Give the raise')) act(G.settleStrike(st)); } }, `Give the ${RAISE()}% raise`)) : null,
@@ -49,7 +60,7 @@ function profileCard(st, e) {
 }
 function deptSummary(st) {
   const d = st.dept, delay = G.accountingDelay(st);
-  return h('section', { class: 'dept-line', 'aria-label': 'Departments' }, h('ul', { class: 'row', tabindex: 0, style: { listStyle: 'none', margin: 0, padding: 0, gap: '6px' } },
+  return h('section', { class: 'dept-line', 'aria-label': 'Departments' }, h('ul', { class: 'row', tabindex: isCompact() ? null : 0, style: { listStyle: 'none', margin: 0, padding: 0, gap: '6px' } },
     [[deptName('finance'), st.employees.some(e => hasRole(e, 'finance')) ? (delay > 2 ? pill(`${delay} days behind`, 'warn') : pill('Up to date', 'ok')) : pill('No staff: bills paid late', 'bad')],
       [deptName('supply'), st.employees.some(e => hasRole(e, 'purchasing')) ? pill(`About ${Math.max(1, Math.round(d.purchCap))} orders a day`, 'ok') : pill('No staff: you place every order', 'warn')],
       ['Sales', pill(d.salesEff < 0.5 ? 'Walk-ins only' : d.salesEff < 1.2 ? 'Modest effort' : 'Strong effort', d.salesEff < 0.5 ? 'warn' : 'ok')],
@@ -73,6 +84,7 @@ export async function profile(empId) {
 // ================= Hiring
 const AD_DAYS = 7;
 export const hire = {
+  paged: true,
   live: true,
   render() {
     const st = app.st, v = (app.viewState.hire ||= { family: AD_TARGETS[0].key });
@@ -84,6 +96,18 @@ export const hire = {
     const ad = st.ads.find(a => a.family === cur.key && a.until > st.time);
     const cost = cur.key === 'director' ? ECONOMY.seniority.directorAdCost : ECONOMY.seniority.adCost;
     const label = t => { const n = resumes.filter(m => familyOf(m) === t.key).length; return n ? `${t.name} (${n})` : t.name; };
+    const parts = t => {
+      const rungs = t.key === 'director' ? [JOBS.director] : ladder(t.key), ad = st.ads.find(a => a.family === t.key && a.until > st.time);
+      const cost = t.key === 'director' ? ECONOMY.seniority.directorAdCost : ECONOMY.seniority.adCost, here = resumes.filter(m => familyOf(m) === t.key);
+      return { rungs, ad, cost, here,
+        desc: h('p', null, rungs[0].desc),
+        ladder: t.key === 'director' ? h('p', { class: 'muted num' }, `${money(marketSalary(st, 'director'))} city pay · ${num(st.employees.filter(e => e.job === 'director').length)} on staff`)
+          : ladderDots(rungs.map(j => j.title), 0, { label: `${t.name} levels`, extra: i => h('span', { class: 'rung-info num' }, h('span', null, money(marketSalary(st, rungs[i - 1].key)), h('span', { class: 'sr-only' }, ' city pay')), h('span', null, `${num(st.employees.filter(e => e.job === rungs[i - 1].key).length)} on staff`)) }),
+        place: ad ? h('p', null, pill(`Ad running until ${fmtShortDate(ad.until)}`, 'info'))
+          : h('div', { class: 'row' }, h('button', { type: 'button', class: 'primary', 'data-key': 'ad-' + t.key, onclick: () => { act(G.placeAd(st, t.key), false, 'order'); document.querySelector(`[data-key="pg-${t.key}"]`)?.focus(); } }, `Place ad (${money(cost)})`, h('span', { class: 'sr-only' }, ` for ${t.name}, runs ${AD_DAYS} days`))),
+        table: resumeTable(st, here, t.name, true) };
+    };
+    if (isCompact()) return pager({ title: 'Hiring', name: 'Kinds of job', state: pagerState('hire'), groups: AD_TARGETS.map(t => { const q = parts(t); return { key: t.key, label: t.name, badge: q.here.length || null, blocks: [q.ladder, q.place, h('h2', { class: 'pg-h2' }, `Resumes on file (${q.here.length})`), q.table, q.desc] }; }) });
     return h('div', { class: 'stack' },
       h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Hiring'), h('p', null, 'Choose a kind of job and place one advert. Over the next week, Juniors, Seniors and sometimes a Director apply; make an offer to hire.'))),
       tabs('Kind of job', AD_TARGETS.map(t => [t.key, label(t)]), cur.key, k => { v.family = k; rerender({}); }, 'hire-panel', 'hire-tab'),
@@ -98,16 +122,16 @@ export const hire = {
         h('section', { class: 'card' }, h('h2', null, `Resumes on file (${here.length})`), resumeTable(st, here, cur.name))));
   },
 };
-function resumeTable(st, resumes, what = '') {
+function resumeTable(st, resumes, what = '', noMenu = false) {
   return table('Resumes', [
     { key: 'name', label: 'Applicant', render: m => h('button', { class: 'link', type: 'button', 'data-key': 'res-' + m.id, onclick: () => openResume(m.id) }, `${m.data.cand.first} ${m.data.cand.last}`) },
     { key: 'job', label: 'Position', render: m => JOBS[m.data.cand.job].title, sort: m => JOBS[m.data.cand.job].id },
     { key: 'fit', label: 'Est. job fit', num: true, render: m => m.data.cand.fitEstimate + '%', sort: m => m.data.cand.fitEstimate },
     { key: 'ask', label: 'Asking', num: true, render: m => money(m.data.cand.ask), sort: m => m.data.cand.ask },
-    { key: 'yrs', label: 'Experience', num: true, render: m => `${m.data.cand.years} yr`, sort: m => m.data.cand.years },
-    { key: 'exp', label: 'Expires', render: m => fmtShortDate(m.data.expires), sortable: false },
+    { key: 'yrs', label: 'Experience', num: true, phone: false, render: m => `${m.data.cand.years} yr`, sort: m => m.data.cand.years },
+    { key: 'exp', label: 'Expires', phone: false, render: m => fmtShortDate(m.data.expires), sortable: false },
     { key: 'go', label: '', sortable: false, render: m => h('button', { type: 'button', 'data-key': 'offer-' + m.id, onclick: () => openResume(m.id) }, 'Review and offer') }],
-    resumes, { hideCaption: true, empty: `No ${what.toLowerCase()} resumes waiting. Place an ad above.`, defaultSort: 'fit', defaultDir: -1 });
+    resumes, { hideCaption: true, empty: `No ${what.toLowerCase()} resumes waiting. Place an ad above.`, defaultSort: 'fit', defaultDir: -1, noMenu });
 }
 
 export async function openResume(memoId) {
@@ -122,24 +146,41 @@ export async function openResume(memoId) {
   const strengths = top.filter(t => !t.neg).sort((a, b) => b.v - a.v).slice(0, 4).map(t => t.label.toLowerCase());
   const weak = top.filter(t => !t.neg).sort((a, b) => a.v - b.v).slice(0, 2).map(t => t.label.toLowerCase());
   const habits = top.filter(t => t.neg && t.v > 65).map(t => t.label.toLowerCase());
-  const body = h('div', { class: 'stack' },
-    kv([['Seeking', JOBS[c.job].title], ['Desired salary', money(c.ask)], ['City average', money(marketSalary(st, c.job))], ['Estimated job fit', c.fitEstimate + '%'], ['Age', String(c.age)], ['Experience', `${c.years} years`]]),
-    h('div', null, h('h3', { style: { fontSize: '1rem' } }, 'Employment history'), c.history.length ? h('ul', null, c.history.map(x => h('li', null, x))) : h('p', null, 'No previous jobs.')),
-    h('p', null, `References describe ${c.female ? 'her' : 'him'} as strong in ${strengths.join(', ')}; weaker in ${weak.join(' and ')}.${habits.length ? ` Known for frequent ${habits.join(' and ')}.` : ''}`),
-    m.data.hired ? h('p', { class: 'good' }, 'Hired.') : m.data.gone ? h('p', { class: 'muted' }, 'No longer available.') : h('div', { class: 'stack', style: { gap: '4px' } }, h('strong', null, 'Your offer (yearly salary)'), offer, h('p', { class: 'muted', style: { margin: 0, fontSize: '0.85rem' } }, 'Offers well below the asking salary are usually turned down.')));
+  const facts = [['Seeking', JOBS[c.job].title], ['Desired salary', money(c.ask)], ['City average', money(marketSalary(st, c.job))], ['Estimated job fit', c.fitEstimate + '%'], ['Age', String(c.age)], ['Experience', `${c.years} years`]];
+  const hist = h('div', null, h('h3', { style: { fontSize: '1rem' } }, 'Employment history'), c.history.length ? h('ul', null, c.history.map(x => h('li', null, x))) : h('p', null, 'No previous jobs.'));
+  const refs = h('p', null, `References describe ${c.female ? 'her' : 'him'} as strong in ${strengths.join(', ')}; weaker in ${weak.join(' and ')}.${habits.length ? ` Known for frequent ${habits.join(' and ')}.` : ''}`);
+  const offerBlock = m.data.hired ? h('p', { class: 'good' }, 'Hired.') : m.data.gone ? h('p', { class: 'muted' }, 'No longer available.') : h('div', { class: 'stack', style: { gap: '4px' } }, h('strong', null, 'Your offer (yearly salary)'), offer, h('p', { class: 'muted stepper-hint', style: { margin: 0, fontSize: '0.85rem' } }, 'Offers well below the asking salary are usually turned down.'));
   const actions = m.data.hired || m.data.gone ? [{ label: 'Close', value: null, primary: true }] : [{ label: 'Close', value: null }, { label: 'Make offer', value: 'offer', primary: true, run: () => { const r = G.makeOffer(st, m.id, offer.stepperValue()); act(r, false, 'hire'); return r.ok || m.data.gone ? true : false; } }];
-  await dialog(`Resume: ${c.first} ${c.last}`, body, actions, { wide: true });
+  // a phone gets two pages: the offer (with the figures that matter to it), then who they are
+  await pagedDialog(`Resume: ${c.first} ${c.last}`, [
+    { key: 'offer', label: 'Offer', blocks: [kv(facts.slice(0, 4)), offerBlock] },
+    { key: 'about', label: 'About them', blocks: [kv(facts.slice(4)), hist, refs] }], actions,
+    () => h('div', { class: 'stack' }, kv(facts), hist, refs, offerBlock), { wide: true });
   rerender({});
 }
 
 // ================= In-basket
 export const inbox = {
+  paged: true,
   live: true,
   render() {
     const st = app.st, v = (app.viewState.inbox ||= { filter: 'all', open: null });
     const list = st.memos.filter(m => v.filter === 'all' || (v.filter === 'unread' && !m.read) || (v.filter === 'resumes' && m.kind === 'resume') || (v.filter === 'important' && m.important));
     const open = v.open != null ? st.memos.find(m => m.id === v.open) : null;
     const filt = h('div', { class: 'row', role: 'group', 'aria-label': 'Show' }, [['all', 'All'], ['unread', 'Unread'], ['important', 'Urgent'], ['resumes', 'Resumes']].map(([k, l]) => h('button', { type: 'button', 'aria-pressed': String(v.filter === k), 'data-key': 'if-' + k, onclick: () => { v.filter = k; rerender({}); } }, l)));
+    if (isCompact()) {
+      const unread = st.memos.filter(m => !m.read).length;
+      const readAll = h('button', { type: 'button', 'data-key': 'memo-readall', onclick: () => { st.memos.forEach(m => { m.read = true; }); act({ ok: true, msg: 'All memos marked read.' }); } }, 'Mark all read');
+      const showSel = h('label', { class: 'sort-menu' }, h('span', null, 'Show'), h('select', { 'data-key': 'if-select', onchange: e => { v.filter = e.target.value; rerender({}); } }, [['all', 'All'], ['unread', 'Unread'], ['important', 'Urgent'], ['resumes', 'Resumes']].map(([k, l]) => h('option', { value: k, selected: v.filter === k }, l))));
+      const ps = pagerState('inbox');
+      const memoList = list.length ? h('ul', { 'data-split': '', class: 'memo-list' }, list.slice(0, 150).map(m => h('li', null, h('button', { type: 'button', 'data-key': 'memo-' + m.id, 'aria-current': open?.id === m.id ? 'true' : null,
+        class: 'memo-btn' + (m.read ? '' : ' unread'), onclick: () => { v.open = m.id; m.read = true; ps.group = 'read'; ps.page = 0; rerender({}); } },
+        h('span', null, m.important ? pill('Urgent', 'bad') : null, ' ', m.subject, h('span', { class: 'muted' }, ` — ${m.from}`), m.read ? '' : h('span', { class: 'sr-only' }, ' (unread)')),
+        h('span', { class: 'muted num memo-date' }, fmtShortDate(m.t)))))) : h('p', { class: 'empty' }, 'Nothing here.');
+      return pager({ title: 'In-basket', name: 'In-basket pages', state: ps, groups: [
+        { key: 'memos', label: 'Memos', badge: unread || null, header: h('div', { class: 'row' }, showSel, readAll), blocks: [memoList] },
+        { key: 'read', label: 'Reader', blocks: [open ? memoCard(st, open) : h('p', { class: 'muted' }, 'Choose a memo to read it.')] }] });
+    }
     return h('div', { class: 'stack' },
       h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'In-basket'), h('p', null, `${num(st.memos.filter(m => !m.read).length)} unread of ${num(st.memos.length)} memos.`)),
         h('div', { class: 'row' }, h('button', { type: 'button', 'data-key': 'memo-readall', onclick: () => { st.memos.forEach(m => { m.read = true; }); act({ ok: true, msg: 'All memos marked read.' }); } }, 'Mark all read'), h('button', { type: 'button', 'data-key': 'memo-clear', onclick: () => { const n = st.memos.length; st.memos = st.memos.filter(m => !m.read || (m.kind === 'resume' && !m.data.hired && !m.data.gone)); act({ ok: true, msg: `Cleared ${n - st.memos.length} read memos.` }); } }, 'Clear read memos'))),

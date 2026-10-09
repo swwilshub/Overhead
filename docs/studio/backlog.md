@@ -53,7 +53,7 @@ Sprint 6 (Sam, 2026-10-09: "everything must be on one screen on mobile"): spec 0
 
 | Spec | Item | Impact | Effort | Pillars | Status | Evidence |
 |---|---|---|---|---|---|---|
-| 016 | **Everything on one screen on a phone:** a pager (large tabs, Previous and Next, swipe) that packs each section's blocks into pages that fit; every section, the start page and the common dialogs. | 5 | L | 1, 4 | specced | Sam; measurements in the spec |
+| 016 | **Everything on one screen on a phone:** a pager (large tabs, Previous and Next, swipe) that packs each section's blocks into pages that fit; every section, the start page and the common dialogs. | 5 | L | 1, 4 | review | Sam; measurements in the spec |
 
 (Earlier plan, now spec 016:) the page-and-swipe pattern and every section split into pages that fit 390 × 844,
 360 × 740 and landscape (F-1, F-3, F-4, F-5).

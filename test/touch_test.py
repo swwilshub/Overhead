@@ -65,10 +65,10 @@ async def main():
         await pg.wait_for_timeout(700)
         glided = False
         for attempt in range(4):   # the glide depends on how fast the test's touch events arrive, so try a few times
-            await pg.evaluate(f"() => {{ const v = {VS}; v.camX = 500; }}"); await pg.tap('[data-key="ft-select"]'); await pg.wait_for_timeout(300)
-            await drag(cdp, (300, 400), (120, 400), steps=5)
+            await pg.evaluate(f"() => {{ const v = {VS}; v.camX = 9999; }}"); await pg.tap('[data-key="ft-select"]'); await pg.wait_for_timeout(300)   # the far edge, so a drag to the right has room
+            await drag(cdp, (120, 400), (300, 400), steps=5)
             a = await state(pg); await pg.wait_for_timeout(150); m = await state(pg); await pg.wait_for_timeout(1500); z = await state(pg); await pg.wait_for_timeout(300); z2 = await state(pg)
-            if m['x'] - a['x'] > 3 or z['x'] - a['x'] > 3: glided = True; break
+            if a['x'] - m['x'] > 3 or a['x'] - z['x'] > 3: glided = True; break
         ok(glided, f'a quick flick carries on after the finger lifts ({a["x"]:.0f} -> {m["x"]:.0f} -> {z["x"]:.0f})')
         ok(abs(z2['x'] - z['x']) < 0.5, 'and it comes to rest')
         await pg.wait_for_timeout(200)
@@ -172,7 +172,7 @@ async def main():
         ok(await pg.locator('.place-bar').count() == 0, 'no placement bar when nothing is being placed')
         await pg.evaluate("() => { document.querySelector('nav.tabbar [data-key=\"menu\"]').click(); }"); await pg.wait_for_timeout(250)
         await pg.tap('dialog.menu-sheet [data-key="nav-catalog"]'); await pg.wait_for_timeout(400)
-        await pg.locator('button:has-text("Place, making")').first.tap(); await pg.wait_for_timeout(700)
+        await pg.locator('button:has-text("Place, making"):visible').first.tap(); await pg.wait_for_timeout(700)
         bar = await pg.locator('.place-bar').inner_text() if await pg.locator('.place-bar').count() else ''
         ok('Place here' in bar and 'Rotate' in bar and 'Cancel' in bar, f'placing shows Place here, Rotate and Cancel: {" ".join(bar.split())}')
         for k in ('place-here', 'place-rotate', 'place-cancel'):
@@ -196,7 +196,7 @@ async def main():
         # place for real
         await pg.evaluate("() => { document.querySelector('nav.tabbar [data-key=\"menu\"]').click(); }"); await pg.wait_for_timeout(250)
         await pg.tap('dialog.menu-sheet [data-key="nav-catalog"]'); await pg.wait_for_timeout(400)
-        await pg.locator('button:has-text("Place, making")').first.tap(); await pg.wait_for_timeout(700)
+        await pg.locator('button:has-text("Place, making"):visible').first.tap(); await pg.wait_for_timeout(700)
         t = await pt(14, 10); await tap(cdp, t); await pg.wait_for_timeout(300)
         await pg.tap('[data-key="place-here"]'); await pg.wait_for_timeout(600)
         ok(await pg.evaluate(f"() => {O}.app.st.floor.objects.length") > objs0 and await pg.evaluate(f"() => {O}.app.st.bank.checking") < cash0, 'Place here buys and places it')

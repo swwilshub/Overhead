@@ -9,6 +9,7 @@ import { unitsPerHour } from '../../sim/world.js';
 import { fullName, skill, activityAt, ACT_LABEL, isWhite } from '../../sim/people.js';
 import { money, num, pct, minuteOfDay, fmtShortDate, fmtDate } from '../../core/util.js';
 import { buyDialog } from './business.js';
+import { pagedDialog, pager, pagerState, layoutPagers } from '../pager.js';
 import { sfx } from '../sound.js';
 import { makeView, screenToTile, drawScene, tileXY, itemColor, T as TILE } from '../topdown.js';
 import { ZOOM_MIN, ZOOM_MAX, clampZoom, clampCam, zoomAbout, toScene, fitCam, reveal, visible, velocity, glide } from '../camera.js';
@@ -126,6 +127,7 @@ export function render() {
     [['old', `Current plant · ${st.city.lots[st.lotId].addr}`], ['new', `New site · ${st.city.lots[st.move.lotId].addr} · ${Math.round(G.moveProgress(st) * 100)}% built`]].map(([k, label]) =>
       h('button', { type: 'button', role: 'tab', 'aria-selected': String((v.site || 'old') === k), 'data-key': 'site-' + k, onclick: () => { v.site = k; v.sel = null; followId = null; rerender({}); document.getElementById('floor-app')?.focus(); announce(k === 'new' ? 'Showing the new site.' : 'Showing the current plant.', 'polite', false); } }, label))) : null;
   const lot = st.city.lots[st.lotId];
+  if (v.sel !== sheetFor) { sheetFor = v.sel; v.sheetOpen = false; }   // a new selection starts collapsed (and the first press of Details must not be swallowed by this reset)
   const aside = h('aside', { class: 'stack hud-panel', 'aria-label': editing() ? 'Cell blueprint' : newSite ? 'Construction' : 'Inspector', id: 'inspector' }, newSite ? movePanel(st) : editing() ? editorPanel(st) : inspector(st, v));
   panelClasses(aside, st, v, newSite);
   const hud = h('div', { class: 'floor-hud' },
@@ -139,7 +141,7 @@ export function render() {
         h('div', { class: 'row hud-buttons' },
           h('button', { type: 'button', 'data-key': 'hud-help', onclick: () => dialog('Help', helpBody(), [{ label: 'Close', value: null, primary: true }], { wide: true }) }, 'Help'),
           h('button', { type: 'button', 'data-key': 'hud-legend', onclick: () => dialog('Legend', legend(), [{ label: 'Close', value: null, primary: true }], { wide: true }) }, 'Legend'),
-          h('button', { type: 'button', 'data-key': 'hud-equipment', onclick: () => dialog('Equipment', equipmentTable(st, v, true), [{ label: 'Close', value: null, primary: true }], { wide: true }) }, 'Equipment list'),
+          h('button', { type: 'button', 'data-key': 'hud-equipment', onclick: () => { const t = equipmentTable(st, v, true); pagedDialog('Equipment', [{ key: 'list', label: 'Equipment', blocks: [...t.children] }], [{ label: 'Close', value: null, primary: true }], () => t, { wide: true }); } }, 'Equipment list'),
           compact ? (newSite || editing() ? null : h('button', { type: 'button', 'data-key': 'hud-info', 'aria-expanded': String(!!v.infoOpen), 'aria-controls': 'inspector', onclick: e => { v.infoOpen = !v.infoOpen; if (v.infoOpen) { v.sel = null; v.sheetOpen = true; } e.currentTarget.setAttribute('aria-expanded', String(v.infoOpen)); updateInspector(); } }, 'Checklist'))
             : h('button', { type: 'button', 'data-key': 'hud-panel', 'aria-expanded': String(!v.panelHidden), 'aria-controls': 'inspector', onclick: () => { v.panelHidden = !v.panelHidden; updateInspector(); const b = document.querySelector('[data-key="hud-panel"]'); if (b) b.setAttribute('aria-expanded', String(!v.panelHidden)); } }, 'Panel')))));
   return h('div', { class: 'floor-stage' }, h('h1', { class: 'sr-only' }, 'Factory floor'), appEl, h('p', { id: helpId, class: 'sr-only' }, keyHelp(), touchUI() ? ' Drag to look around and pinch to zoom. Tap a machine to select it.' : ' Drag empty floor to look around, and use the wheel to zoom.'), hud);
@@ -435,10 +437,11 @@ function panelClasses(el, st, v, newSite) {
 function syncLayout() {
   const stage = document.querySelector('.floor-stage'), el = document.getElementById('inspector'); if (!stage) return;
   const sheet = el && el.classList.contains('sheet') && !el.classList.contains('away');
-  stage.style.setProperty('--sheet-h', sheet ? el.offsetHeight + 'px' : '0px');
+  const side = sheet && matchMedia('(max-height: 500px)').matches && !!el.querySelector('.sheet-pager');   // a side column on a phone on its side
+  stage.style.setProperty('--sheet-h', sheet && !side ? el.offsetHeight + 'px' : '0px');
 }
 let sheetFor = null; // the selection the sheet was last opened for: a new selection starts collapsed
-function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (v.sel !== sheetFor) { sheetFor = v.sel; v.sheetOpen = false; } if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(frag(inspector(st, v))); panelClasses(el, st, v, !!st.move && v.site === 'new'); syncLayout(); }
+function updateInspector() { const el = document.getElementById('inspector'); if (!el) return; const st = app.st, v = vs(); if (v.sel !== sheetFor) { sheetFor = v.sel; v.sheetOpen = false; } if (st.move && v.site === 'new') el.replaceChildren(movePanel(st)); else if (!editing()) el.replaceChildren(frag(inspector(st, v))); panelClasses(el, st, v, !!st.move && v.site === 'new'); syncLayout(); layoutPagers(el); }
 // Collapsed, the sheet shows the item's name and status and leaves the plant in view; Details opens the rest.
 function sheetActions(v) {
   return h('div', { class: 'sheet-actions' },
@@ -468,7 +471,17 @@ function inspector(st, v) {
     card.append(kv([['Value', money(o.value)], ['Bought', fmtShortDate(o.bought)]]));
   }
   if (!o.fixed) card.append(h('div', { class: 'row' }, o.kind === 'cell' || o.kind === 'suite' ? null : h('button', { type: 'button', 'data-key': 'obj-move', onclick: () => beginMove(st, vs()) }, 'Move'), h('button', { type: 'button', class: 'danger', 'data-key': 'obj-sell', onclick: () => sellSelected(st, vs()) }, st.time - o.bought < 1440 ? 'Return for refund' : `Sell (${money(o.value)})`)));
-  return card;
+  return isCompact() && v.sheetOpen ? pagedCard(card, o) : card;
+}
+// With Details open on a phone the card is pages, never a scroll: the name, buttons and status stay up top, and the rest is packed
+// into pages of the sheet's height that Previous, Next and a swipe walk through. Lists inside it split row by row.
+function pagedCard(card, o) {
+  const kids = [...card.children], head = kids.slice(0, kids[2]?.matches('p') ? 3 : 2), rest = kids.slice(head.length);
+  const blocks = [];
+  for (const b of rest) { b.classList.contains('supply') ? (b.setAttribute('data-split', ''), b.querySelectorAll('ul').forEach(u => u.setAttribute('data-split', ''))) : b.classList.contains('stack') && b.setAttribute('data-split', ''); blocks.push(b); }
+  const state = pagerState('inspector'); if (state.sel !== o.id) { state.sel = o.id; state.group = 'details'; state.page = 0; }
+  const pg = pager({ title: '', groups: [{ key: 'details', label: 'Details', blocks }], state, name: 'Details' });
+  return h('section', { class: 'card stack sheet-card', 'aria-labelledby': 'insp-h' }, h('div', { class: 'sheet-head' }, ...head), h('div', { class: 'sheet-pager' }, pg));
 }
 function suiteInspector(st, o, card) {
   const a = analyseSuite(o), staff = st.employees.filter(e => e.assign === o.id);
