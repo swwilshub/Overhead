@@ -54,10 +54,9 @@ Three things moved from the specs, all recorded in `decisions.md`:
 - **The output-per-employee band (5 to 15%) is not asserted.** Output per head depends mostly on which products the bot
   picks, so the comparison would mislead.
 
-**Open question for Sam: the foreman.** The foreman effect (a lift to the whole floor, up to 18%) is now only on the
-Operations Director, level 3. A new player cannot buy a foreman on day one; they promote an operator (about two years) or
-get lucky with an advert (5%). I chose this for balance safety. Putting it on Senior is one line in `data/world.json`
-and would need the long test re-run.
+**The foreman (decided).** The foreman effect (a lift to the whole floor, up to 18%) is only on the Operations Director,
+level 3. A new player cannot buy a foreman on day one; they promote an operator (about two years) or get lucky with an
+advert (5%). Sam confirmed this stays.
 
 ## What slipped
 
