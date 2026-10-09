@@ -1,5 +1,8 @@
 # DRAFT: staff seniority and a one-screen phone game
 
+**Status:** the owner chose seniority first. Specs [010](010-seniority-ladders.md) to [013](013-seniority-balance.md)
+are sprint 3; the one-screen pager is sprint 4.
+
 Not a spec yet. A design brief for the owner to react to, written from his message: "everything needs to fit on one
 screen… large tabs and left and right navs, especially for clustered menus… avoid vertical scrolling… stack some game
 elements: almost all job roles have levels of seniority… staff start at the bottom and 'learn' through 3 stages,

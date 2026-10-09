@@ -30,6 +30,22 @@ into four specs (one large, three medium).
 Left for later: the cell designer on a phone, tablet-specific layouts, swipe between sections, and everything left over
 from sprint 1.
 
+## Sprint 3 (triaged 2026-10-09 from `playtests/sprint-3.md` and Sam's brief)
+
+Sam's request: everything should fit one phone screen, with large tabs and left and right navs; and staff should have
+levels (Junior, Senior, Director) that they learn through, with one simple advert. He chose to do the staff change first.
+The one-screen work is sprint 4.
+
+| Spec | Item | Impact | Effort | Pillars | Status | Evidence |
+|---|---|---|---|---|---|---|
+| 010 | **Seniority ladders:** 21 jobs in seven families and three levels, experience, automatic promotion, save version 2. | 5 | L | 1, 3 | specced | Sam; F-2 |
+| 011 | **One advert, applicants at any level:** a single advert per family and a Hiring page of family tabs. | 5 | M | 1, 3, 4 | specced | Sam; F-1, F-2 |
+| 012 | **Profile cards:** one card per person with the three-dot line, in a carousel; a reusable carousel. | 4 | M | 1, 4 | specced | Sam; F-3 |
+| 013 | **Balance for seniority:** pay, skill and experience numbers that keep the 24-month bands. | 4 | S | 3 | specced | economy |
+
+Sprint 4 (planned): the page-and-swipe pattern and every section split into pages that fit 390 × 844, 360 × 740 and
+landscape (F-1, F-3, F-4, F-5).
+
 ## Full backlog
 
 | # | Item | Impact | Effort | Pillars | Status | Notes |
