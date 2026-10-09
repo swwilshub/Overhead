@@ -3,7 +3,7 @@
 //   2. Hatches: move the door, the input hatches (one per material) and the output hatch around the outside of the wall.
 //   3. Furnish: place the required items (included in the price), then duplicates and extras, and confirm.
 // Keyboard and mouse do the same things; every step is announced.
-import { h, frag, announce, describe, confirmBox, pill } from '../dom.js';
+import { h, frag, announce, describe, confirmBox, pill, captureFocus, restoreFocus } from '../dom.js';
 import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
@@ -168,7 +168,7 @@ export function editorDraw(st) {
 }
 
 // ---------- side panel
-function refreshPanel() { const el = document.getElementById('inspector'); if (el) el.replaceChildren(editorPanel(app.st)); app.dirty = true; }
+function refreshPanel() { const el = document.getElementById('inspector'); if (el) { const f = captureFocus(el); el.replaceChildren(editorPanel(app.st)); restoreFocus(f, el); } app.dirty = true; }
 export function editorPanel(st) {
   const v = fv(), E = v.cell, d = E.draft, fam = d.family;
   const k = K(d), steps = k.stepNames, cur = { size: 0, hatch: 1, furnish: 2 }[E.stage];

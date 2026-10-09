@@ -1,5 +1,5 @@
-import { h, frag, table, kv, announce, describe, confirmBox, pill, meter, field } from '../dom.js';
-import { app, go, render as rerender, act, reducedMotion, setupProblems } from '../app.js';
+import { h, frag, table, kv, announce, describe, confirmBox, pill, meter, field, nameBy } from '../dom.js';
+import { app, go, render as rerender, act, reducedMotion, setupProblems, shortcutsOn, navPending } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
 import { JOBS, hasRole, canRunMachine, jobFor, deptColor, DEPT_LIST, aOrAn } from '../../core/content.js';
@@ -51,7 +51,8 @@ export function render() {
     h('button', { type: 'button', 'aria-label': 'Zoom out', 'data-key': 'ft-zo', disabled: v.pix <= 1, onclick: () => { v.pix = Math.max(1, v.pix - 1); rerender({}); } }, '−'),
     h('span', { class: 'num', 'aria-live': 'off' }, v.pix + '×'),
     h('button', { type: 'button', 'aria-label': 'Zoom in', 'data-key': 'ft-zi', disabled: v.pix >= 4, onclick: () => { v.pix = Math.min(4, v.pix + 1); rerender({}); } }, '+'));
-  const help = h('p', { id: helpId, class: 'floor-help' }, 'Arrow keys move the cursor one square (Shift moves five). Enter selects or places. R rotates. M moves the selected item. Delete sells it. Escape cancels.');
+  const help = h('p', { id: helpId, class: 'floor-help' }, 'Arrow keys move the cursor one square (Shift moves five). Enter selects or places. R rotates. M moves the selected item. Delete sells it. Escape cancels. ',
+    shortcutsOn() ? 'Space starts or pauses the clock, and [ ], ? and g then a letter work here too.' : 'Space also selects or places.');
   const fixes = newSite ? [] : setupProblems(st);
   const siteTabs = st.move ? h('div', { class: 'site-tabs', role: 'tablist', 'aria-label': 'Which building' },
     [['old', `Current plant · ${st.city.lots[st.lotId].addr}`], ['new', `New site · ${st.city.lots[st.move.lotId].addr} · ${Math.round(G.moveProgress(st) * 100)}% built`]].map(([k, label]) =>
@@ -103,11 +104,12 @@ function wireCanvas(el, st, v, view) {
   canvas.addEventListener('pointerdown', e => { if (e.button === 2) return; el.focus(); const [x, y] = toTile(e); v.cx = x; v.cy = y; dragging = true; primary(st, v); });
   canvas.addEventListener('contextmenu', e => { e.preventDefault(); cancel(v); });
   el.addEventListener('keydown', e => {
+    if (navPending(e)) return; // the key after g belongs to navigation (app.js), so g m doesn't start a move
     const fl = onNewSite(st, v) ? st.move.floor : st.floor; const step = e.shiftKey ? 5 : 1;
     const mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
     if (v.mode === 'cell' && editorKey(e, st)) return;
     if (mv) { lastKeyNav = performance.now(); e.preventDefault(); const nx = Math.max(0, Math.min(fl.w - 1, v.cx + mv[0])), ny = Math.max(0, Math.min(fl.h - 1, v.cy + mv[1])); sfx(nx === v.cx && ny === v.cy ? 'bump' : 'tick'); v.cx = nx; v.cy = ny; scrollToCursor(); speakCursor(st, v); return; }
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); primary(st, v); return; }
+    if (e.key === 'Enter' || (e.key === ' ' && !shortcutsOn())) { e.preventDefault(); primary(st, v); return; } // with shortcuts on, Space runs the clock
     if (e.key === 'Escape') { e.preventDefault(); cancel(v); return; }
     if (e.key === 'r' || e.key === 'R') { e.preventDefault(); v.rot = (v.rot + 1) % 4; announce(`Rotated to ${v.rot * 90} degrees.`, 'polite', false); speakCursor(st, v); return; }
     if ((e.key === 'm' || e.key === 'M') && v.sel) { e.preventDefault(); beginMove(st, v); return; }
@@ -203,7 +205,7 @@ export function selectObj(o) {
 // The list of things that need the owner, in its own container so a light refresh can swap it without a redraw.
 function needsAttention(st, fixes) {
   const fl = st.floor;
-  return fixes.length ? h('div', { class: 'notice', role: 'region', 'aria-label': 'Setup issues' }, h('strong', null, 'Needs attention: '), h('ul', { style: { margin: '4px 0 0', paddingLeft: '1.2em' } }, fixes.map(f => h('li', null, f.text, ' ', h('button', { class: 'link', type: 'button', onclick: () => { if (f.obj) { const o = fl.objects.find(o => o.id === f.obj); selectObj(o); } else go(f.view); } }, f.obj ? 'Show me' : 'Fix'))))) : null;
+  return fixes.length ? h('div', { class: 'notice', role: 'region', 'aria-label': 'Setup issues' }, h('strong', null, 'Needs attention: '), h('ul', { style: { margin: '4px 0 0', paddingLeft: '1.2em' } }, fixes.map(f => { const t = h('span', null, f.text); return h('li', null, t, ' ', nameBy(h('button', { class: 'link', type: 'button', onclick: () => { if (f.obj) { const o = fl.objects.find(o => o.id === f.obj); selectObj(o); } else go(f.view); } }, f.obj ? 'Show me' : 'Fix'), t)); }))) : null;
 }
 const needsSig = fixes => fixes.map(f => f.text + '|' + (f.obj ?? f.view)).join('\n');
 function updateNeeds() {
@@ -227,7 +229,7 @@ function inspector(st, v) {
     card.append(h('p', null, OFFICES[o.officeType].desc), kv([['Occupant', occ ? `${fullName(occ)}, ${JOBS[occ.job].title}` : 'Empty'], ['Value', money(o.value)]]));
     const cands = st.employees.filter(e => isWhite(e));
     const sel = h('select', { id: 'office-occ' }, h('option', { value: '' }, 'Nobody'), cands.map(e => h('option', { value: e.id, selected: occ?.id === e.id }, `${fullName(e)} (${JOBS[e.job].title})`)));
-    card.append(field('Assign office to', sel), h('button', { type: 'button', onclick: () => { const id = sel.value ? +sel.value : null; if (occ && occ.id !== id) G.assign(st, occ.id, null); if (id) act(G.assign(st, id, o.id)); else { act({ ok: true, msg: 'Office cleared.' }); } } }, 'Assign'));
+    card.append(field('Assign office to', sel), h('button', { type: 'button', 'data-key': 'office-assign', onclick: () => { const id = sel.value ? +sel.value : null; if (occ && occ.id !== id) G.assign(st, occ.id, null); if (id) act(G.assign(st, id, o.id)); else { act({ ok: true, msg: 'Office cleared.' }); } } }, 'Assign'));
   } else if (o.fixed) {
     const d = { breakroom: 'Where staff eat lunch and take coffee breaks.', restroom: 'Staff need it a couple of times a day.', dock: 'Deliveries arrive here and shipments leave from here.', exit: 'Smokers without a smoking zone step outside here.' }[o.kind];
     card.append(h('p', null, d));
@@ -237,7 +239,7 @@ function inspector(st, v) {
     if (o.kind === 'conveyor' || o.kind === 'bin') card.append(beltLineCard(st, o));
     card.append(kv([['Value', money(o.value)], ['Bought', fmtShortDate(o.bought)]]));
   }
-  if (!o.fixed) card.append(h('div', { class: 'row' }, o.kind === 'cell' || o.kind === 'suite' ? null : h('button', { type: 'button', onclick: () => beginMove(st, vs()) }, 'Move'), h('button', { type: 'button', class: 'danger', onclick: () => sellSelected(st, vs()) }, st.time - o.bought < 1440 ? 'Return for refund' : `Sell (${money(o.value)})`)));
+  if (!o.fixed) card.append(h('div', { class: 'row' }, o.kind === 'cell' || o.kind === 'suite' ? null : h('button', { type: 'button', 'data-key': 'obj-move', onclick: () => beginMove(st, vs()) }, 'Move'), h('button', { type: 'button', class: 'danger', 'data-key': 'obj-sell', onclick: () => sellSelected(st, vs()) }, st.time - o.bought < 1440 ? 'Return for refund' : `Sell (${money(o.value)})`)));
   return card;
 }
 function suiteInspector(st, o, card) {
@@ -248,7 +250,7 @@ function suiteInspector(st, o, card) {
   const free = st.employees.filter(e => isWhite(e) && e.assign !== o.id);
   const sel = h('select', { id: 'suite-add' }, free.map(e => h('option', { value: e.id }, `${fullName(e)} (${JOBS[e.job].title}${e.assign ? ', has an office' : ''})`)));
   card.append(h('div', { class: 'stack', style: { gap: '6px' }, role: 'group', 'aria-labelledby': 'occ-h' }, h('h3', { id: 'occ-h' }, `Occupants (${staff.length} of ${a.seats})`),
-    staff.length ? h('ol', { class: 'port-list' }, staff.map((e, i) => h('li', null, `Desk ${i + 1}: ${fullName(e)}, ${JOBS[e.job].title} `, h('button', { type: 'button', class: 'link', onclick: () => { G.assign(st, e.id, null); act({ ok: true, msg: `${fullName(e)} moved out of suite #${o.id}.` }); } }, 'Move out')))) : h('p', { class: 'muted' }, 'Nobody yet.'),
+    staff.length ? h('ol', { class: 'port-list' }, staff.map((e, i) => { const t = h('span', null, `Desk ${i + 1}: ${fullName(e)}, ${JOBS[e.job].title}`); return h('li', null, t, ' ', nameBy(h('button', { type: 'button', class: 'link', 'data-key': 'suite-out-' + e.id, onclick: () => { G.assign(st, e.id, null); act({ ok: true, msg: `${fullName(e)} moved out of suite #${o.id}.` }); } }, 'Move out'), t)); })) : h('p', { class: 'muted' }, 'Nobody yet.'),
     staff.length < a.seats && free.length ? [field('Give a desk to', sel), h('button', { type: 'button', 'data-key': 'suite-add', onclick: () => { const id = +sel.value; const e = st.employees.find(x => x.id === id); if (e.assign) G.assign(st, id, null); act(G.assign(st, id, o.id)); } }, 'Assign desk')]
       : staff.length >= a.seats ? h('p', { class: 'muted' }, 'Every desk is taken. Add a desk to seat more people.') : h('button', { class: 'link', type: 'button', onclick: () => go('hire') }, 'Hire office staff')));
   card.append(kv([['Value', money(o.value)], ['Built', fmtShortDate(o.bought)]]));
@@ -266,13 +268,13 @@ function cellInspector(st, o, card) {
   const eligible = st.employees.filter(e => canRunMachine(e) && e.assign !== o.id);
   const sel = h('select', { id: 'cell-crew-add' }, eligible.map(e => h('option', { value: e.id }, `${fullName(e)} (${JOBS[e.job].title}${e.assign ? ', busy elsewhere' : ''})`)));
   card.append(h('div', { class: 'stack', style: { gap: '6px' }, role: 'group', 'aria-labelledby': 'crew-h' }, h('h3', { id: 'crew-h' }, `Crew (${crew.length})`),
-    crew.length ? h('ul', { class: 'port-list' }, crew.map(e => h('li', null, `${fullName(e)}, ${JOBS[e.job].title} `, h('button', { type: 'button', class: 'link', onclick: () => { G.assign(st, e.id, null); act({ ok: true, msg: `${fullName(e)} taken off ${objectLabel(st, o)}.` }); } }, 'Remove')))) : h('p', { class: 'muted' }, 'Nobody yet. A cell needs at least one operator.'),
+    crew.length ? h('ul', { class: 'port-list' }, crew.map(e => { const t = h('span', null, `${fullName(e)}, ${JOBS[e.job].title}`); return h('li', null, t, ' ', nameBy(h('button', { type: 'button', class: 'link', 'data-key': 'crew-out-' + e.id, onclick: () => { G.assign(st, e.id, null); act({ ok: true, msg: `${fullName(e)} taken off ${objectLabel(st, o)}.` }); } }, 'Remove'), t)); })) : h('p', { class: 'muted' }, 'Nobody yet. A cell needs at least one operator.'),
     eligible.length ? [field('Add to crew', sel, `This layout can use up to ${a.opsUseful} operator${a.opsUseful > 1 ? 's' : ''}.`), h('button', { type: 'button', 'data-key': 'cell-crew', onclick: () => { const id = +sel.value; const e = st.employees.find(x => x.id === id); if (e.assign) G.assign(st, id, null); act(G.assign(st, id, o.id)); } }, 'Add operator')]
       : h('button', { class: 'link', type: 'button', onclick: () => go('hire') }, `Hire ${aOrAn(jobFor('operator').title)}`)));
   // product
   const fam = RECIPES.filter(x => x.family === o.family);
   const prodSel = h('select', { id: 'mach-prod' }, fam.map(x => h('option', { value: x.id, selected: x.id === o.recipe, disabled: !G.recipeAvailable(st, x.id) }, `${ITEMS[x.out].name}${G.recipeAvailable(st, x.id) ? ` (sells ~${money(st.city.market[x.out].price)})` : ' (needs research on a machine)'}`)));
-  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Product', prodSel, `Retooling costs ${money(Math.round(FAMILIES[o.family].price * 0.08))}.`), h('button', { type: 'button', onclick: () => act(G.setRecipe(st, o.id, +prodSel.value), false, 'retool') }, 'Retool')));
+  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Product', prodSel, `Retooling costs ${money(Math.round(FAMILIES[o.family].price * 0.08))}.`), h('button', { type: 'button', 'data-key': 'mach-retool', onclick: () => act(G.setRecipe(st, o.id, +prodSel.value), false, 'retool') }, 'Retool')));
   card.append(kv([['Made this month', num(o.producedMonth)], ['Made in total', num(o.produced)], ['Maintenance', o.broken ? `Broken, repair ${Math.round(o.repair * 100)}%` : `${Math.round(o.credits)}% serviced`], ['Value', money(o.value)]]));
 }
 function machineInspector(st, o, card) {
@@ -290,16 +292,16 @@ function machineInspector(st, o, card) {
   // operator
   const eligible = st.employees.filter(e => (o.mode === 'research' ? hasRole(e, 'researcher') : canRunMachine(e)));
   const opSel = h('select', { id: 'mach-op' }, h('option', { value: '' }, 'Nobody'), eligible.map(e => h('option', { value: e.id, selected: op?.id === e.id }, `${fullName(e)} (${JOBS[e.job].title}${e.assign && e.assign !== o.id ? ', busy' : ''})`)));
-  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field(o.mode === 'research' ? jobFor('researcher').title : 'Operator', opSel), h('div', { class: 'row' }, h('button', { type: 'button', onclick: () => { const id = opSel.value ? +opSel.value : null; if (op && op.id !== id) G.assign(st, op.id, null); if (id) { const e = st.employees.find(x => x.id === id); if (e.assign) G.assign(st, id, null); act(G.assign(st, id, o.id)); } else act({ ok: true, msg: 'Machine has no operator now.' }); } }, 'Assign'),
+  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field(o.mode === 'research' ? jobFor('researcher').title : 'Operator', opSel), h('div', { class: 'row' }, h('button', { type: 'button', 'data-key': 'mach-assign', onclick: () => { const id = opSel.value ? +opSel.value : null; if (op && op.id !== id) G.assign(st, op.id, null); if (id) { const e = st.employees.find(x => x.id === id); if (e.assign) G.assign(st, id, null); act(G.assign(st, id, o.id)); } else act({ ok: true, msg: 'Machine has no operator now.' }); } }, 'Assign'),
     !eligible.length ? h('button', { class: 'link', type: 'button', onclick: () => go('hire') }, `Hire ${aOrAn(jobFor(o.mode === 'research' ? 'researcher' : 'operator').title)}`) : null)));
   // product / research
   const fam = RECIPES.filter(x => x.family === o.family);
   const prodSel = h('select', { id: 'mach-prod' }, fam.map(x => h('option', { value: x.id, selected: x.id === o.recipe && o.mode === 'produce', disabled: !G.recipeAvailable(st, x.id) }, `${ITEMS[x.out].name}${G.recipeAvailable(st, x.id) ? ` (sells ~${money(st.city.market[x.out].price)})` : ' (needs research)'}`)));
-  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Product', prodSel, `Retooling costs ${money(Math.round(FAMILIES[o.family].price * 0.08))}.`), h('button', { type: 'button', onclick: () => act(G.setRecipe(st, o.id, +prodSel.value), false, 'retool') }, 'Retool')));
+  card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Product', prodSel, `Retooling costs ${money(Math.round(FAMILIES[o.family].price * 0.08))}.`), h('button', { type: 'button', 'data-key': 'mach-retool', onclick: () => act(G.setRecipe(st, o.id, +prodSel.value), false, 'retool') }, 'Retool')));
   const locked = fam.filter(x => !G.recipeAvailable(st, x.id));
   if (locked.length) {
     const rs = h('select', { id: 'mach-res' }, locked.map(x => h('option', { value: x.id }, ITEMS[x.out].name + (st.city.aiKnown[x.id] ? ' (known in town: faster)' : ''))));
-    card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Research a new product', rs, `Needs ${aOrAn(jobFor('researcher').title)} at this machine, and stops production while it runs.`), h('button', { type: 'button', onclick: () => act(G.startResearch(st, o.id, +rs.value), false, 'retool') }, 'Start research')));
+    card.append(h('div', { class: 'stack', style: { gap: '6px' } }, field('Research a new product', rs, `Needs ${aOrAn(jobFor('researcher').title)} at this machine, and stops production while it runs.`), h('button', { type: 'button', 'data-key': 'mach-research', onclick: () => act(G.startResearch(st, o.id, +rs.value), false, 'retool') }, 'Start research')));
   }
 }
 // ---------- belt lines
@@ -541,7 +543,7 @@ function checklist(st) {
   ];
   const done = steps.filter(s => s[0]).length;
   return h('section', { class: 'card stack', 'aria-labelledby': 'cl-h' }, h('h2', { id: 'cl-h', tabindex: -1 }, 'Getting started'), h('p', { class: 'muted' }, `${done} of ${steps.length} done`),
-    h('ol', { style: { margin: 0, paddingLeft: '1.3em', display: 'grid', gap: '4px' } }, steps.map(([ok, text, view]) => h('li', null, h('span', { class: ok ? 'good' : '' }, ok ? '✓ ' : '', text), ok ? h('span', { class: 'sr-only' }, ' (done)') : view ? [' ', h('button', { class: 'link', type: 'button', onclick: () => go(view) }, 'Go')] : null))));
+    h('ol', { style: { margin: 0, paddingLeft: '1.3em', display: 'grid', gap: '4px' } }, steps.map(([ok, text, view]) => { const t = h('span', { class: ok ? 'good' : '' }, ok ? '✓ ' : '', text); return h('li', null, t, ok ? h('span', { class: 'sr-only' }, ' (done)') : view ? [' ', nameBy(h('button', { class: 'link', type: 'button', onclick: () => go(view) }, 'Go'), t)] : null); })));
 }
 
 function equipmentTable(st, v) {

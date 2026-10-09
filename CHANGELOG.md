@@ -32,6 +32,8 @@ Player-facing changes, newest first.
   calls the "Hand cart" a **Pallet jack**, matching the machine panel and to-do memos.
 - Memos about the plant come from "Plant log" instead of a "Plant manager" you can't hire. Old saves keep their old
   memo text.
+- Keyboard and screen reader: Space, `[`, `]`, `?` and `g` plus a letter now work on the factory floor too, focus
+  stays where you were after pressing a button, and repeated buttons say which row they act on ("Details, Akron, OH").
 - Movers on the construction site now wear the right department colours.
 - Loading a save made by a newer version of the game now says so, instead of failing quietly.
 - Stray code text is gone: the side panel no longer shows "[object HTMLElement]" after you click an empty square, and

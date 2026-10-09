@@ -147,7 +147,7 @@ async def main():
         # axe on each view
         await pg.add_script_tag(content=AXE)
         total = {}
-        for v in ['floor','catalog','staff','hire','inbox','purchasing','sales','bank','reports','city','nation','options']:
+        for v in ['floor','catalog','research','staff','hire','inbox','purchasing','sales','bank','reports','city','nation','options']:
             await pg.click(f'nav.rail a[href="#{v}"]'); await pg.wait_for_timeout(250)
             await no_junk_text(pg, f'{v} view after a month')
             res = await pg.evaluate("async () => { const r = await axe.run(document, {resultTypes:['violations']}); return r.violations.map(v => ({id: v.id, impact: v.impact, n: v.nodes.length, ex: v.nodes.slice(0,2).map(n => n.target.join(' ') + ' :: ' + (n.failureSummary||'').slice(0,160))})) }")

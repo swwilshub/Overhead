@@ -28,7 +28,9 @@ export const purchasing = {
     const anyItem = h('select', { id: 'buy-any' }, ['material', 'component', 'product'].map(t => h('optgroup', { label: t === 'material' ? 'Raw materials' : t === 'component' ? 'Components' : 'Finished goods' }, ITEMS.filter(i => i.tier === t).map(i => h('option', { value: i.id }, i.name)))));
     return h('div', { class: 'stack' },
       h('div', { class: 'view-head' }, h('div', null, h('h1', null, 'Purchasing'), h('p', null, staffed ? 'Purchasing staff reorder stock up to the targets below every morning.' : `Nobody does the buying, so stock only gets reordered when you do it. ${aOrAn(jobFor('purchasing').title, true)} would handle it every morning.`)),
-        h('div', { class: 'row' }, h('button', { type: 'button', onclick: () => { st.targets = G.suggestedTargets(st); act({ ok: true, msg: 'Targets set to about three days of use.' }); } }, 'Suggest targets'), h('button', { class: 'primary', type: 'button', onclick: () => act(G.purchaseAll(st), false, 'order') }, 'Purchase all to target'))),
+        h('div', { class: 'row' }, h('button', { type: 'button', 'data-key': 'pur-suggest', onclick: () => { st.targets = G.suggestedTargets(st); act({ ok: true, msg: 'Targets set to about three days of use.' }); } }, 'Suggest targets'),
+          // focus stays on the button, so the polite message is the only sign it worked, whether or not anything was ordered
+          h('button', { class: 'primary', type: 'button', 'data-key': 'pur-all', onclick: () => { const r = G.purchaseAll(st); announce(r.msg, 'polite'); act(r, true, 'order'); } }, 'Purchase all to target'))),
       h('section', { class: 'card' }, kv([['Storage', `${num(stored)} of ${num(cap)} boxes (${pct(stored / cap)})`], ['On order', `${num(G.allOnOrder(st))} boxes`], ['Room left for orders', `${num(G.roomForOrders(st))} boxes (15% is held back for finished goods)`]])),
       h('section', { class: 'card' }, h('h2', null, 'Stock and targets'),
         table('Materials and components', [
@@ -86,7 +88,7 @@ export const sales = {
           { key: 'rev', label: 'Revenue', num: true, render: r => money(r.rev) },
           { key: 'share', label: 'Share of demand', num: true, render: r => pct(r.sold / Math.max(1, r.demand)), sort: r => r.sold / Math.max(1, r.demand) },
           { key: 'selling', label: 'Sell it?', sortable: false, render: r => h('input', { type: 'checkbox', checked: r.selling, 'aria-label': `Sell ${r.name} (unchecked keeps it for our own machines)`, 'data-key': 'sell-' + r.id, onchange: e => { st.sell[r.id] = e.target.checked; announce(e.target.checked ? `Selling ${r.name}.` : `Keeping ${r.name} for production.`, 'polite', false); } }) },
-          { key: 'reset', label: '', sortable: false, render: r => h('button', { type: 'button', onclick: () => { delete st.prices[r.id]; act({ ok: true, msg: `${r.name} follows the market price again.` }); } }, 'Match market') }],
+          { key: 'reset', label: '', sortable: false, render: r => h('button', { type: 'button', 'data-key': 'match-' + r.id, onclick: () => { delete st.prices[r.id]; act({ ok: true, msg: `${r.name} follows the market price again.` }); } }, 'Match market') }],
         rows, { hideCaption: true, empty: 'No products yet. Finished goods appear here once a machine makes them.' })));
   },
 };
@@ -141,9 +143,9 @@ export const bank = {
           h('button', { class: 'primary', type: 'button', onclick: async () => { const y = +years.value, a = +loanAmt.value, r = G.loanRate(st, y), i = r / 12, n = y * 12; const pmt = a * i / (1 - Math.pow(1 + i, -n)); if (await confirmBox('Take this loan?', `Borrow ${money(a)} for ${y} years at ${(r * 100).toFixed(2)}%. Payments of ${money(pmt)} a month.`, 'Borrow')) act(G.takeLoan(st, a, y), false, 'cash'); } }, 'Apply for loan'))),
       h('section', { class: 'card' }, h('h2', null, 'Loans'),
         table('Loans', [
-          { key: 'principal', label: 'Borrowed', num: true, render: l => money(l.principal) }, { key: 'balance', label: 'Balance', num: true, render: l => money(l.balance) },
-          { key: 'rate', label: 'Rate', num: true, render: l => (l.rate * 100).toFixed(2) + '%' }, { key: 'payment', label: 'Monthly', num: true, render: l => money(l.payment) },
-          { key: 'left', label: 'Payments left', num: true }, { key: 'pay', label: '', sortable: false, render: l => h('button', { type: 'button', onclick: () => act(G.payOffLoan(st, l.id), false, 'cash') }, 'Pay off') }],
+          { key: 'principal', label: 'Borrowed', num: true, render: l => h('span', { 'data-rowname': '' }, money(l.principal)) }, { key: 'balance', label: 'Balance', num: true, render: l => money(l.balance) },
+          { key: 'rate', label: 'Rate', num: true, render: l => h('span', { 'data-rowname': '' }, (l.rate * 100).toFixed(2) + '%') }, { key: 'payment', label: 'Monthly', num: true, render: l => money(l.payment) },
+          { key: 'left', label: 'Payments left', num: true }, { key: 'pay', label: '', sortable: false, render: l => h('button', { type: 'button', 'data-key': 'payoff-' + l.id, onclick: () => act(G.payOffLoan(st, l.id), false, 'cash') }, 'Pay off') }],
         b.loans, { hideCaption: true, rowHeader: false, empty: 'No loans.' })),
       h('section', { class: 'card' }, h('h2', null, 'Checking statement'),
         table('Recent transactions', [
@@ -231,7 +233,7 @@ function techSection(st) {
     h('p', null, `Unlocks extras for production cells. Any ${jobFor('researcher').title} not at a research machine works on it (${free.length} now). One project at a time; you pay when it starts.`),
     a ? h('div', { class: 'stack', style: { gap: '4px' } }, h('p', null, h('strong', null, TECHS[a.id].name), ` · ${Math.floor(a.hours)} of ${a.need} engineer-hours${free.length ? '' : ' · paused: no engineer is free'}`), meter(a.hours / a.need, `${TECHS[a.id].name} progress`)) : null,
     table('Cell technologies', [
-      { key: 'name', label: 'Technology', render: r => h('span', null, h('strong', null, r.name), h('br'), h('small', { class: 'muted' }, r.desc)) },
+      { key: 'name', label: 'Technology', render: r => h('span', null, h('strong', { 'data-rowname': '' }, r.name), h('br'), h('small', { class: 'muted' }, r.desc)) },
       { key: 'unlocks', label: 'Unlocks' },
       { key: 'hours', label: 'Hours', num: true },
       { key: 'cost', label: 'Cost', num: true, render: r => money(r.cost) },
@@ -305,8 +307,9 @@ export const options = {
           h('li', null, 'Grow: link machines with conveyor belts, add pallet jacks and forklifts, staff up the office, keep a mechanic on hand, research new products, and move to a bigger building when you run out of room.'))),
       h('section', { class: 'card stack' }, h('h2', null, 'Keyboard'),
         table('Keyboard shortcuts', [{ key: 0, label: 'Keys' }, { key: 1, label: 'Action' }], [
-          ['Space', 'Start or pause the clock (when focus is not on a button)'], ['[ and ]', 'Slower or faster'], ['g then f', 'Factory floor'], ['g then c', 'Catalog'], ['g then s', 'Staff'], ['g then h', 'Hiring'], ['g then i', 'In-basket'], ['g then p', 'Purchasing'], ['g then l', 'Sales'], ['g then b', 'Bank'], ['g then r', 'Reports'], ['g then m', 'City map'], ['g then n', 'Nation'], ['g then d', 'Research'], ['?', 'This page'],
-          ['On the floor: arrows', 'Move the cursor (Shift: five squares)'], ['Enter', 'Select or place'], ['R', 'Rotate'], ['M', 'Move the selected item'], ['Delete', 'Sell the selected item'], ['I', 'Jump to the inspector'], ['Escape', 'Cancel']], { hideCaption: true })),
+          ['Space', 'Start or pause the clock, on the factory floor too (not when focus is on a button)'], ['[ and ]', 'Slower or faster'], ['g then f', 'Factory floor'], ['g then c', 'Catalog'], ['g then s', 'Staff'], ['g then h', 'Hiring'], ['g then i', 'In-basket'], ['g then p', 'Purchasing'], ['g then l', 'Sales'], ['g then b', 'Bank'], ['g then r', 'Reports'], ['g then m', 'City map'], ['g then n', 'Nation'], ['g then d', 'Research'], ['?', 'This page'],
+          ['After g', 'The next key only moves between screens, on the factory floor too: g then m opens the City map and does not start a move'],
+          ['On the floor: arrows', 'Move the cursor (Shift: five squares)'], ['Enter', 'Select or place (Space as well when single-key shortcuts are off)'], ['R', 'Rotate'], ['M', 'Move the selected item'], ['Delete', 'Sell the selected item'], ['I', 'Jump to the inspector'], ['Escape', 'Cancel']], { hideCaption: true })),
       h('section', { class: 'card stack' }, h('h2', null, 'About'),
         h('p', null, 'Overhead is a 90s-style factory management sim, released as free software: the code under the MIT licence, the art and text under CC BY 4.0. City populations come from the US Census Bureau, and the map from us-atlas. The source code and credits are in the project repository.')));
   },
