@@ -1,7 +1,9 @@
 // Equipment catalog: one tab per production line, ordered by model tier, then equipment and offices. Each line
 // shows a labelled preview of its machine (inputs, output, operator's post, service hatch) and its products.
 import { h, table, pill, kv, field } from '../dom.js';
-import { app, render as rerender } from '../app.js';
+import { app, render as rerender, isCompact } from '../app.js';
+import { pager, pagerState } from '../pager.js';
+import { kvParts } from '../dom.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
 import { jobFor, aOrAn } from '../../core/content.js';
@@ -19,8 +21,10 @@ const vs = () => (app.viewState.catalog ||= { cat: 'f0', product: {} });
 // lines from Mk I (components) up to Mk IV, cheapest first within a tier, then equipment and offices
 const TABS = [...FAMILIES.slice().sort((a, b) => a.tier - b.tier || a.price - b.price).map(f => ['f' + f.id, f.tab]), ['equip', 'Equipment'], ['office', 'Offices']];
 
+export const paged = true;
 export function render() {
   const st = app.st, v = vs();
+  if (isCompact()) return catalogPages(st);
   if (!v.product) v.product = {};
   const pick = k => { v.cat = k; rerender({}); document.getElementById('tab-' + k)?.focus(); };
   const tabs = h('div', { class: 'cat-tabs', role: 'tablist', 'aria-label': 'Catalog sections' },
@@ -261,4 +265,52 @@ export function mounted() {
     if (typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(() => layoutLines(fig)); ro.observe(fig); }
     document.fonts?.ready?.then(() => fig.isConnected && layoutLines(fig));
   }
+}
+
+// ---------- a phone: each line is a page group, the machine as a short list of blocks
+function catalogPages(st) {
+  const v = vs(), ps = pagerState('catalog'); if (!ps.group) ps.group = v.cat;
+  const strip = n => [...n.children].filter(c => c.tagName !== 'H2');
+  return pager({ title: 'Catalog', name: 'Catalog sections', state: ps, groups: TABS.map(([k, label]) => {
+    if (k === 'equip') { const e = equipment(st); return { key: k, label, blocks: [...e.querySelectorAll('.cat-item'), ...strip(e.lastChild)] }; }
+    if (k === 'office') { const o = offices(st); const [suite, ready] = [...o.children]; return { key: k, label, blocks: [...strip(suite), h('h3', { class: 'pg-h2' }, 'Ready-made offices'), ...ready.querySelectorAll('.cat-item')] }; }
+    return { key: k, label, blocks: familyBlocks(st, +k.slice(1)) };
+  }) });
+}
+function familyBlocks(st, fid) {
+  const f = FAMILIES[fid], v = vs();
+  const recs = RECIPES.filter(r => r.family === fid);
+  let rid = v.product[fid];
+  if (rid == null || !recs.some(r => r.id === rid)) rid = (recs.find(r => G.recipeAvailable(st, r.id)) || recs[0]).id;
+  const r = RECIPES[rid], avail = G.recipeAvailable(st, rid), mk = st.city.market;
+  const cost = r.inputs.reduce((s, [i, q]) => s + mk[i].price * q, 0) / r.outQty;
+  const sel = h('select', { id: 'cat-product', onchange: e => { v.product[fid] = +e.target.value; rerender({}); document.getElementById('cat-product')?.focus(); } },
+    recs.map(x => h('option', { value: x.id, selected: x.id === rid }, ITEMS[x.out].name + (G.recipeAvailable(st, x.id) ? '' : ' (needs research)'))));
+  const spec = { kind: 'machine', family: fid, label: f.name + ' machine', ...(avail ? { recipe: rid } : {}) };
+  const rows = recs.map(x => ({ r: x, name: ITEMS[x.out].name, rate: unitsPerHour(x.id), price: mk[x.out].price, cost: x.inputs.reduce((s, [i, q]) => s + mk[i].price * q, 0) / x.outQty, ok: G.recipeAvailable(st, x.id) }));
+  return [
+    h('div', { class: 'row cat-head' }, h('canvas', { class: 'range-sprite', width: 6 * T * 2, height: (4 * T + 6) * 2, 'aria-hidden': 'true', 'data-range': fid }),
+      h('div', null, h('h2', { class: 'pg-h2' }, `${f.name} machine`), h('span', { class: 'mk-tag' }, TIER_NAME[machineTier(fid)]))),
+    h('div', { class: 'row' }, placeBtn(spec, f.price, avail ? `Place, making ${ITEMS[r.out].name}` : 'Place'),
+      h('button', { type: 'button', 'data-key': 'build-cell', onclick: () => startCell(fid, avail ? rid : null) }, `Build as a cell (from ${money(cellPrice(fid, MIN_SIZE[0], MIN_SIZE[1]))})`)),
+    field('Show product', sel),
+    avail ? null : h('p', null, pill('Needs research', 'warn', '!'), ` ${aOrAn(jobFor('researcher').title, true)} has to develop this product on one of these machines first.`),
+    ...kvParts([
+      ['Makes', `${ITEMS[r.out].name}${r.outQty > 1 ? ` (${r.outQty} per cycle)` : ''}`],
+      ['Rated output', `${unitsPerHour(r.id).toFixed(1)} units an hour`],
+      ['Materials per unit', h('ul', { class: 'port-list' }, r.inputs.map(([i, q], k) => h('li', null, h('span', { class: 'swatch', 'aria-hidden': 'true', style: { background: itemColor(i) } }), `Input ${k + 1}: ${+(q / r.outQty).toFixed(3)} ${ITEMS[i].name}`)))],
+      ['Material cost', `${money2(cost)} a unit`],
+      ['Sells for', h('span', null, `${money2(mk[r.out].price)} a unit, margin `, h('span', { class: mk[r.out].price > cost ? 'good' : 'bad' }, money2(mk[r.out].price - cost)))],
+      ['Size', `${KINDS.machine.w} × ${KINDS.machine.h} squares, plus ${inputPorts({ kind: 'machine', family: fid, x: 0, y: 0 }).length} input squares, an output square, an operator's post and a service hatch, all kept clear`],
+      ['Reliability', `About ${num(f.mtbf)} running hours between breakdowns`],
+      ['You own', `${st.floor.objects.filter(o => o.kind === 'machine' && o.family === fid).length}`]], 3),
+    table(`${f.name} products`, [
+      { key: 'name', label: 'Product', render: x => h('button', { type: 'button', class: 'link', onclick: () => { v.product[fid] = x.r.id; rerender({}); } }, x.name), sort: x => x.name },
+      { key: 'ok', label: 'Status', render: x => x.ok ? pill('Available', 'ok') : pill(st.city.aiKnown[x.r.id] ? 'Research (known in town)' : 'Needs research', 'warn') },
+      { key: 'rate', label: 'Units / hour', num: true, render: x => x.rate.toFixed(1) },
+      { key: 'inputs', label: 'Inputs per unit', phone: false, render: x => x.r.inputs.map(([i, q], k) => `${k + 1}: ${+(q / x.r.outQty).toFixed(3)} ${ITEMS[i].name}`).join('; ') },
+      { key: 'cost', label: 'Materials', num: true, render: x => money2(x.cost) },
+      { key: 'price', label: 'Sells for', num: true, render: x => money2(x.price) },
+      { key: 'margin', label: 'Margin', num: true, render: x => h('span', { class: x.price > x.cost ? 'good' : 'bad' }, money2(x.price - x.cost)), sort: x => x.price - x.cost }],
+    rows, { hideCaption: true, noMenu: true })].filter(Boolean);
 }

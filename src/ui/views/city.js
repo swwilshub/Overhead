@@ -1,10 +1,12 @@
-import { h, table, kv, announce, confirmBox, field, pill, dialog, meter } from '../dom.js';
+import { h, table, kv, kvParts, announce, confirmBox, field, pill, dialog, meter } from '../dom.js';
 import { app, go, render as rerender, act } from '../app.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, ITEM_ID, ECONOMY } from '../../gen/data.js';
 import { GRID_W, GRID_H, lotDistance } from '../../sim/world.js';
 import { money, money2, num, moneyShort } from '../../core/util.js';
 import { buildingSprite } from '../iso.js';
+import { pager, pagerState, pagedDialog } from '../pager.js';
+import { isCompact } from '../compact.js';
 import { makeView, drawScene } from '../topdown.js';
 import { fmtDate } from '../../core/util.js';
 import { objectLabel } from '../../sim/floor.js';
@@ -30,8 +32,9 @@ function glyphBuild(l, st) {
   const bucket = l.sqft < 30000 ? 0 : l.sqft < 60000 ? 1 : 2;
   return h('img', { src: buildingSprite('build', bucket, Math.min(3, Math.floor(G.moveProgress(st) * 4)), darkTheme()), alt: '', width: 36, height: 34, style: { imageRendering: 'pixelated', pointerEvents: 'none' } });
 }
+export const paged = true;
 export function render() {
-  const st = app.st, city = st.city, v = vs();
+  const st = app.st, city = st.city, v = vs(), compact = isCompact();
   const playing = st.phase === 'play';
   if (v.sel == null) v.sel = playing ? st.lotId : city.lots.find(l => l.firm == null).id;
   const itemId = v.item;
@@ -49,7 +52,7 @@ export function render() {
       const extra = [isP ? 'sells ' + ITEMS[itemId].name : '', isC ? 'buys ' + ITEMS[itemId].name : ''].filter(Boolean).join(', ');
       row.append(h('div', { role: 'gridcell' }, h('button', { type: 'button', class: cls, tabindex: l.id === v.sel ? 0 : -1, 'data-key': 'lot-' + l.id, 'data-lot': l.id,
         'aria-label': lotLabel(st, l) + (extra ? `. ${extra}` : ''), 'aria-pressed': String(l.id === v.sel),
-        onclick: () => { v.sel = l.id; rerender({}); } }, (building ? glyphBuild(l, st) : glyph(l, mine ? 'mine' : firm ? 'firm' : 'vacant')), h('span', { class: 'mark', 'aria-hidden': 'true' }))));
+        onclick: () => { v.sel = l.id; if (compact) { const ps = pagerState('city'); ps.group = 'lot'; ps.page = 0; } rerender({}); } }, (building ? glyphBuild(l, st) : glyph(l, mine ? 'mine' : firm ? 'firm' : 'vacant')), h('span', { class: 'mark', 'aria-hidden': 'true' }))));
     }
     grid.append(row);
   }
@@ -71,6 +74,18 @@ export function render() {
     h('span', null, h('i', { style: { background: 'var(--lot-vacant)', outline: '1.5px dashed var(--hazard)' } }), 'For rent (sign on the lot)'),
     h('span', null, h('i', { style: { boxShadow: 'inset 0 0 0 2px var(--info)' } }), 'P sells, C buys the selected product'));
 
+  if (compact) {
+    // a phone: the map is a pane that pans inside its page; the chosen building, the market and the ranks are pages of their own
+    const ps = pagerState('city'), inner = n => [...n.children].filter(c => c.tagName !== 'H2');
+    const scroller = h('div', { class: 'city-scroll', role: 'region', 'aria-label': `Map of ${city.name}` }, grid);
+    setTimeout(() => { const b = scroller.querySelector(`[data-lot="${v.sel}"]`); if (b && scroller.isConnected) { scroller.scrollLeft = b.offsetLeft - scroller.clientWidth / 2 + 22; scroller.scrollTop = b.offsetTop - scroller.clientHeight / 2 + 22; } }, 0);
+    const lot = lotPanel(st, city.lots[v.sel]), mkt = marketPanel(st, v, producerFirms, consumerFirms);
+    return pager({ title: playing ? city.name : `Lease a building in ${city.name}`, name: 'City pages', state: ps, groups: [
+      { key: 'map', label: 'Map', blocks: [h('div', { class: 'city-pane' }, scroller, legend)] },
+      { key: 'lot', label: 'Building', blocks: [h('h2', { class: 'pg-h2' }, city.lots[v.sel].addr), ...inner(lot)] },
+      { key: 'market', label: 'Market', blocks: inner(mkt) },
+      ...(playing ? [{ key: 'ranks', label: 'Ranks', blocks: inner(ranksCard(st)) }] : [])] });
+  }
   return h('div', { class: 'stack' },
     h('div', { class: 'view-head' }, h('div', null, h('h1', null, playing ? `${city.name}` : `Lease a building in ${city.name}`),
       h('p', null, playing ? 'The industrial district: your suppliers, customers and competitors.' : 'Grey dashed buildings are for rent. Pick one near the producers and buyers of what you plan to make. A building of 25,000 to 40,000 square feet is plenty to start.')),
@@ -118,18 +133,18 @@ async function moveDialog(st, l) {
   const cv = h('canvas', { class: 'move-preview', 'aria-hidden': 'true' });
   const left = plan.dropped?.map(id => st.floor.objects.find(o => o.id === id)).filter(Boolean) || [];
   const belts = left.filter(o => o.kind === 'conveyor').length, others = left.filter(o => o.kind !== 'conveyor');
-  const body = h('div', { class: 'stack' },
-    plan.floor ? h('figure', { class: 'move-fig' }, cv, h('figcaption', { class: 'muted' }, `How your plant would be laid out at ${l.addr}: ${plan.floor.w} × ${plan.floor.h} squares, against ${st.floor.w} × ${st.floor.h} now. The layout keeps its place relative to the shipping dock.`)) : null,
-    kv([
+  const figure = plan.floor ? h('figure', { class: 'move-fig' }, cv, h('figcaption', { class: 'muted' }, `How your plant would be laid out at ${l.addr}: ${plan.floor.w} × ${plan.floor.h} squares, against ${st.floor.w} × ${st.floor.h} now. The layout keeps its place relative to the shipping dock.`)) : null;
+  const factPairs = [
       ['Floor space', `${num(cur.sqft)} → ${num(l.sqft)} sq ft`],
       ['Rent', `${money(cur.rent)} → ${money(l.rent)} a month (${l.rent >= cur.rent ? '+' : '−'}${money(Math.abs(l.rent - cur.rent))})`],
       plan.cost != null ? ['Due today', `${money(plan.cost + l.rent)}: moving ${money(plan.cost)} and the first month's rent`] : null,
       plan.days ? ['Building and moving', `About ${plan.days} days. The current plant keeps running until then, and you pay rent on both.`] : null,
       plan.moved ? ['Coming along', `${plan.moved.length} items${plan.shifted.length ? `, ${plan.shifted.length} moved to a nearby spot because the new building's rooms are in the way` : ''}`] : null,
-      left.length ? ['Left behind and sold', [others.map(o => objectLabel(st, o)).join(', '), belts ? `${others.length ? ', ' : ''}${belts} belt sections` : ''].join('')] : null]),
-    !plan.ok ? h('p', { class: 'sup-alert', role: 'alert' }, plan.msg) : null);
+      left.length ? ['Left behind and sold', [others.map(o => objectLabel(st, o)).join(', '), belts ? `${others.length ? ', ' : ''}${belts} belt sections` : ''].join('')] : null];
+  const alertP = !plan.ok ? h('p', { class: 'sup-alert', role: 'alert' }, plan.msg) : null;
   if (plan.floor) drawPlan(cv, plan.floor);
-  const go2 = await dialog(`Move to ${l.addr}?`, body, plan.ok ? [{ label: 'Cancel', value: false }, { label: `Move here (${money(plan.cost + l.rent)})`, value: true, primary: true }] : [{ label: 'Close', value: false, primary: true }], { wide: true });
+  const go2 = await pagedDialog(`Move to ${l.addr}?`, [{ key: 'plan', label: 'Plan', blocks: [figure, ...kvParts(factPairs, 3), alertP].filter(Boolean) }], plan.ok ? [{ label: 'Cancel', value: false }, { label: `Move here (${money(plan.cost + l.rent)})`, value: true, primary: true }] : [{ label: 'Close', value: false, primary: true }],
+    () => h('div', { class: 'stack' }, figure, kv(factPairs), alertP), { wide: true });
   if (!go2) return;
   const r = G.startMove(st, l.id);
   act(r, false, 'cash');

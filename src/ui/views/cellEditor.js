@@ -4,7 +4,8 @@
 //   3. Furnish: place the required items (included in the price), then duplicates and extras, and confirm.
 // Keyboard and mouse do the same things; every step is announced.
 import { h, frag, announce, describe, confirmBox, pill, captureFocus, restoreFocus } from '../dom.js';
-import { app, go, render as rerender, act } from '../app.js';
+import { app, go, render as rerender, act, isCompact } from '../app.js';
+import { pager, pagerState, layoutPagers } from '../pager.js';
 import * as G from '../../sim/game.js';
 import { ITEMS, RECIPES, FAMILIES } from '../../gen/data.js';
 import { inBounds, objectAt, placementProblem, objectLabel, cellName } from '../../sim/floor.js';
@@ -169,8 +170,17 @@ export function editorDraw(st) {
 }
 
 // ---------- side panel
-function refreshPanel() { const el = document.getElementById('inspector'); if (el) { const f = captureFocus(el); el.replaceChildren(editorPanel(app.st)); restoreFocus(f, el); } app.dirty = true; }
+function refreshPanel() { const el = document.getElementById('inspector'); if (el) { const f = captureFocus(el); el.replaceChildren(editorPanel(app.st)); layoutPagers(el); restoreFocus(f, el); } app.dirty = true; }
+// On a phone the designer is pages too (spec 016): the title and steps stay up top, the buttons stay at the bottom, and what lies between
+// (the instructions, the item lists, the numbers) is packed into pages of the sheet's height. The floor stays in view above it.
 export function editorPanel(st) {
+  const card = editorCard(st); if (!isCompact()) return card;
+  const kids = [...card.children], foot = kids[kids.length - 1], blocks = kids.slice(1, -1), E = fv().cell;
+  for (const b of blocks) if (b.tagName === 'UL') b.setAttribute('data-split', '');
+  const pg = pager({ title: '', groups: [{ key: 'body', label: 'Designer', blocks }], state: pagerState('cell-' + E.stage), name: 'Designer' });
+  return h('section', { class: 'card stack cell-panel sheet-card', 'aria-labelledby': 'cell-ed-h' }, kids[0], h('div', { class: 'sheet-pager' }, pg), foot);
+}
+function editorCard(st) {
   const v = fv(), E = v.cell, d = E.draft, fam = d.family;
   const k = K(d), steps = k.stepNames, cur = { size: 0, hatch: 1, furnish: 2 }[E.stage];
   const head = h('div', { class: 'cell-head' }, h('h2', { tabindex: -1, id: 'cell-ed-h' }, k.title),

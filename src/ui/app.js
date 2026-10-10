@@ -1,5 +1,6 @@
 // App shell: status bar, navigation, the run loop, refresh with focus preservation.
 import { h, frag, announce, prefs, dialog, confirmBox, captureFocus, restoreFocus } from './dom.js';
+import { layoutPagers } from './pager.js';
 import { isCompact, COMPACT_QUERY, compactMq } from './compact.js';
 import * as G from '../sim/game.js';
 import { fmtDate, fmtTime, money, moneyShort, minuteOfDay, isWorkday, MIN_PER_DAY, monthKey, weekday } from '../core/util.js';
@@ -60,7 +61,8 @@ export function render(opts = {}) {
   const prevFocus = captureFocus(root);
   const main = document.getElementById('main');
   const scroll = main ? main.scrollTop : 0;
-  root.replaceChildren(statusBar(), h('div', { class: 'body' }, navRail(), h('main', { id: 'main', tabindex: -1, class: app.view === 'floor' ? 'floor-main' : null }, viewContent())));
+  root.replaceChildren(statusBar(), h('div', { class: 'body' }, navRail(), h('main', { id: 'main', tabindex: -1, class: app.view === 'floor' ? 'floor-main' : (isCompact() && app.views[app.view]?.paged) ? 'pager-main' : null }, viewContent())));
+  layoutPagers(root);   // measure the pages before focus goes back to a control that may sit on one
   const nm = document.getElementById('main');
   if (opts.focusMain) { nm.scrollTop = 0; const hd = nm.querySelector('h1'); (hd || nm).setAttribute('tabindex', '-1'); (hd || nm).focus({ preventScroll: true }); }
   else { nm.scrollTop = scroll; restoreFocus(prevFocus, root); }

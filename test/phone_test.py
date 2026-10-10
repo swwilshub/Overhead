@@ -122,11 +122,13 @@ async def main():
         await axe_check(pg, 'phone panel sheet collapsed')
         await pg.tap('[data-key="sheet-more"]'); await pg.wait_for_timeout(300)
         sh = await box(pg, '#inspector.sheet')
-        ok(await pg.locator('[data-key="sheet-more"]').get_attribute('aria-expanded') == 'true' and sh['h'] <= vh * 0.55 + 1 and 'inputs' in (await pg.locator('#inspector').inner_text()).lower(), f'Details expands it ({sh["h"]:.0f} px, at most 55% of the screen)')
+        ok(await pg.locator('[data-key="sheet-more"]').get_attribute('aria-expanded') == 'true' and sh['h'] <= vh * 0.8 + 1 and 'inputs' in (await pg.locator('#inspector').inner_text()).lower(), f'Details expands it ({sh["h"]:.0f} px, at most 80% of the screen)')
+        for _ in range(8):   # Details are pages (spec 016): Next until the Move and Sell buttons come round
+            if await pg.locator('[data-key="obj-sell"]:visible').count(): break
+            await pg.tap('#inspector [data-key="pg-next"]'); await pg.wait_for_timeout(200)
         sell = await box(pg, '[data-key="obj-sell"]')
         ok(sell is not None, 'the Move and Sell buttons are reachable in the expanded sheet')
         await axe_check(pg, 'phone panel sheet expanded')
-        await pg.evaluate("() => document.querySelector('[data-key=\"obj-sell\"]').scrollIntoView({block: 'center'})")
         await pg.tap('[data-key="obj-sell"]'); await pg.wait_for_timeout(300)
         d = await box(pg, 'dialog[open]')
         ok(d is not None and abs(d['b'] - vh) <= 1 and d['w'] >= 389, 'Sell asks in a sheet at the bottom')
@@ -148,19 +150,19 @@ async def main():
         async def to(v):
             await open_menu(pg); await pg.tap(f'dialog.menu-sheet [data-key="nav-{v}"]'); await pg.wait_for_timeout(350)
         await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(300)
-        await to('nation')
-        d = await pg.evaluate("() => { const td = document.querySelector('.table-wrap td[data-label]:not([data-label=\"\"])'), tr = td.closest('tr'), th = document.querySelector('.table-wrap thead'); const r = th.getBoundingClientRect(); return { tr: getComputedStyle(tr).display, td: getComputedStyle(td).display, label: td.dataset.label, thead: [r.width, r.height], rowW: tr.getBoundingClientRect().width, vw: innerWidth, role: document.querySelector('.table-wrap table').getAttribute('role') }; }")
-        ok(d['tr'] == 'block' and d['td'] == 'flex' and d['label'] and d['thead'][0] <= 1 and d['rowW'] <= d['vw'] - 20, f'a table is a list of cards ({d})')
+        await to('nation'); await pg.tap('[data-key="pg-cities"]'); await pg.wait_for_timeout(300)
+        d = await pg.evaluate("() => { const td = document.querySelector('.table-wrap tr:not([hidden]) td[data-label]:not([data-label=\"\"])'), tr = td.closest('tr'), th = document.querySelector('.table-wrap thead'); const r = th.getBoundingClientRect(); return { tr: getComputedStyle(tr).display, td: getComputedStyle(td).display, label: td.dataset.label, thead: [r.width, r.height], rowW: tr.getBoundingClientRect().width, vw: innerWidth, role: document.querySelector('.table-wrap table').getAttribute('role') }; }")
+        ok(d['tr'] in ('block', 'grid') and d['td'] == 'flex' and d['label'] and d['thead'][0] <= 1 and d['rowW'] <= d['vw'] - 20, f'a table is a list of cards ({d})')
         roles = await pg.evaluate("() => ({ table: document.querySelectorAll('.table-wrap table[role=table]').length, rows: document.querySelectorAll('.table-wrap tr[role=row]').length, ch: document.querySelectorAll('.table-wrap th[role=columnheader]').length, rh: document.querySelectorAll('.table-wrap th[role=rowheader]').length, cells: document.querySelectorAll('.table-wrap td[role=cell]').length })")
         ok(roles['table'] >= 1 and roles['rows'] > 1 and roles['ch'] >= 5 and roles['rh'] >= 5 and roles['cells'] > 10, f'the card layout keeps the table, row, header and cell roles for screen readers ({roles})')
         snap = await pg.locator('main').aria_snapshot()
         ok('- table' in snap and '- rowheader' in snap and '- columnheader' in snap and '- cell' in snap, 'the accessibility tree still shows a table with headers and cells')
-        lab = await pg.evaluate("() => getComputedStyle(document.querySelector('.table-wrap td[data-label]:not([data-label=\\\"\\\"])'), '::before').content")
+        lab = await pg.evaluate("() => getComputedStyle(document.querySelector('.table-wrap tr:not([hidden]) td[data-label]:not([data-label=\\\"\\\"])'), '::before').content")
         ok('Department' in lab or len(lab) > 3, f'each value shows its column name ({lab})')
         # sort menu
-        await to('nation')
+        await to('nation'); await pg.tap('[data-key="pg-cities"]'); await pg.wait_for_timeout(300)
         ok(await pg.locator('.table-wrap th button.sort').count() == 0, 'cards have no header sort buttons')
-        first = lambda: pg.evaluate("() => document.querySelector('.table-wrap tbody tr th').textContent.trim()")
+        first = lambda: pg.evaluate("() => document.querySelector('.table-wrap tbody tr:not([hidden]) th').textContent.trim()")
         opts = await pg.locator('[data-key="sort-menu"] option').all_inner_texts()
         ok(len(opts) >= 8 and any('Metro population, low to high' == o for o in opts) and any('City, A to Z' == o for o in opts), f'a Sort by menu lists each column both ways: {opts[:4]}')
         await pg.select_option('[data-key="sort-menu"]', 'metro:1'); await pg.wait_for_timeout(300); a1 = await first()
@@ -168,21 +170,22 @@ async def main():
         ok(a1 != a2, f'choosing another order reorders the cards ({a1} first, then {a2})')
         sel = await pg.locator('[data-key="sort-menu"]').evaluate("e => e.value")
         ok(sel == 'metro:-1', f'the menu shows the order in use ({sel})')
-        # the Nation page: a map picture above the city card, cities chosen from the list
-        nm = await pg.evaluate("() => { const svg = document.querySelector('.nation svg'), card = document.querySelector('.nation #city-info-h')?.closest('section, .card'); const a = svg.getBoundingClientRect(), b = card.getBoundingClientRect(); return { aria: svg.getAttribute('aria-hidden'), w: a.width, above: a.bottom <= b.top + 1, dots: document.querySelectorAll('.nation .city-dot[tabindex]').length, see: document.querySelectorAll('[data-key^=\"see-\"]').length }; }")
-        ok(nm['aria'] == 'true' and nm['w'] >= 330 and nm['above'] and nm['dots'] == 0 and nm['see'] == 42, f'the map is a full-width picture above the city card and cities are chosen from the list ({nm})')
+        # the Nation page: a map picture on its own page, and cities chosen from the list
+        await pg.tap('[data-key="pg-map"]'); await pg.wait_for_timeout(300)
+        nm = await pg.evaluate("() => { const svg = document.querySelector('.nation-map svg'); const a = svg.getBoundingClientRect(); return { aria: svg.getAttribute('aria-hidden'), w: a.width, dots: document.querySelectorAll('.city-dot[tabindex]').length, see: document.querySelectorAll('[data-key^=\"see-\"]').length }; }")
+        ok(nm['aria'] == 'true' and nm['w'] >= 330 and nm['dots'] == 0 and nm['see'] == 42, f'the map is a full-width picture and cities are chosen from the list ({nm})')
         # Catalog tabs are one row
         await to('catalog')
-        tabs = await pg.evaluate("() => { const t = [...document.querySelectorAll('.cat-tabs [role=tab]')], bar = document.querySelector('.cat-tabs').getBoundingClientRect(), sel = document.querySelector('.cat-tabs [aria-selected=true]').getBoundingClientRect(); return { rows: new Set(t.map(e => Math.round(e.getBoundingClientRect().top))).size, n: t.length, selIn: sel.left >= bar.left - 1 && sel.right <= bar.right + 1, scrolls: document.querySelector('.cat-tabs').scrollWidth > bar.width }; }")
+        tabs = await pg.evaluate("() => { const t = [...document.querySelectorAll('.pager-tabs [role=tab]')], bar = document.querySelector('.pager-tabs').getBoundingClientRect(), sel = document.querySelector('.pager-tabs [aria-selected=true]').getBoundingClientRect(); return { rows: new Set(t.map(e => Math.round(e.getBoundingClientRect().top))).size, n: t.length, selIn: sel.left >= bar.left - 1 && sel.right <= bar.right + 1, scrolls: document.querySelector('.pager-tabs').scrollWidth > bar.width }; }")
         ok(tabs['rows'] == 1 and tabs['n'] >= 10 and tabs['selIn'] and tabs['scrolls'], f'the Catalog tabs are one scrolling row with the chosen one in view ({tabs})')
-        await pg.tap('#tab-f9'); await pg.wait_for_timeout(400)
-        selin = await pg.evaluate("() => { const bar = document.querySelector('.cat-tabs').getBoundingClientRect(), sel = document.querySelector('.cat-tabs [aria-selected=true]').getBoundingClientRect(); return sel.left >= bar.left - 1 && sel.right <= bar.right + 1; }")
+        await pg.tap('[data-key="pg-f9"]'); await pg.wait_for_timeout(400)
+        selin = await pg.evaluate("() => { const bar = document.querySelector('.pager-tabs').getBoundingClientRect(), sel = document.querySelector('.pager-tabs [aria-selected=true]').getBoundingClientRect(); return sel.left >= bar.left - 1 && sel.right <= bar.right + 1; }")
         ok(selin, 'choosing a tab further along keeps it in view')
         # every control is finger-sized, on every section
         SWEEP = """() => { const out = []; for (const e of document.querySelectorAll('button, a[href], select, input, textarea, summary, [role=tab]')) {
             if (e.closest('thead') || e.classList.contains('skip') || e.closest('[hidden]') || e.closest('dialog:not([open])') || e.type === 'hidden') continue;
             const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || cs.display === 'none') continue;
-            e.scrollIntoView({ block: 'center', inline: 'center' }); const r = e.getBoundingClientRect(); if (r.width === 0 || r.height === 0) continue;
+            if (!e.closest('.pager, .floor-hud')) e.scrollIntoView({ block: 'center', inline: 'center' }); const r = e.getBoundingClientRect(); if (r.width === 0 || r.height === 0) continue;
             if (r.width >= 44 && r.height >= 44) continue;
             const x = r.x + r.width / 2, y = r.y + r.height / 2, hit = (px, py) => { const a = document.elementFromPoint(px, py); return a === e || (a && e.contains(a)); };
             if (r.width >= 44 && (e.classList.contains('link') || e.classList.contains('sort')) && hit(x, y - 20) && hit(x, y + 20)) continue;   // a 44 px tap area around a text link

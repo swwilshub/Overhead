@@ -24,7 +24,7 @@ repository, the latest build is also published there.
 On a phone or tablet the game uses a slim top bar, a bottom bar (Floor, Staff, In-basket, Menu) and bottom sheets for
 questions and for the machine you tap. The factory floor fills the whole window, with the controls floating over it. Drag to look around (a flick keeps
 going), pinch to zoom, tap to select, and press **Place here** to put something down. With a mouse, drag empty floor to
-look around and use the wheel to zoom. Tables become cards, and nothing scrolls sideways.
+look around and use the wheel to zoom. Every page fits the screen: each section is a few pages with large tabs along the top (or down the side on a landscape phone), Previous and Next buttons, and a swipe left or right. A long list is several pages instead of a scroll.
 
 ### How it plays
 

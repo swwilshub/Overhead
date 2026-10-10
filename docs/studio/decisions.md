@@ -139,3 +139,28 @@ Newest first. Each entry: date, decision, reason.
 - **2026-10-09 — Off-screen text no longer makes the page taller.** The two live regions were absolutely positioned at the
   bottom and pushed the document one pixel past the window on every page. They are fixed now, so the floor page cannot
   scroll at all. Found by the new floor test.
+
+- **2026-10-09 — On a phone, every section is pages, not a scroll (spec 016).** A section's content is grouped into large tabs; each
+  group's blocks are measured and packed into as many pages as fit the visible height; Previous, Next and a swipe walk through every
+  page in order. Reason: Sam, twice ("no everything must be on one screen on mobile"). Pages are computed from measured heights, not
+  hand-cut, so a longer list makes more pages instead of a scroll, and a new section only has to name its groups.
+- **2026-10-09 — The pager is for phones only.** A desktop keeps its long pages. Compact means width ≤ 700 px or height ≤ 500 px
+  (the existing query), so a phone on its side is paged too.
+- **2026-10-09 — Tables are split row by row and become grids of labelled values on a phone.** A long table (Staff, Equipment,
+  Purchasing) continues on the next page rather than shrinking. A row is never cut in half.
+- **2026-10-09 — The catalog's range preview is dropped on a phone.** It was the largest block on the page and the least useful
+  one at that size; the facts about each product are kept.
+- **2026-10-09 — The city map pans inside its own page.** It fills the page it is on and pans and zooms there; it does not make the
+  page taller.
+- **2026-10-09 — In landscape the tabs are a left rail and Previous/Next are arrows at the edges.** The portrait bottom bar would
+  cost a quarter of the height of a phone on its side.
+- **2026-10-09 — Dialogs are paged too.** Resume and offer, Buy, the equipment list, Help, Legend, the move plan and the loan
+  confirmation fit the sheet (88% of the height) with their buttons always visible under the pages.
+- **2026-10-09 — The item inspector and the cell designer are pages in the bottom sheet.** With Details open, the name, status and
+  buttons stay up top and the rest is packed into pages (lists inside it split row by row). The designer keeps its steps and its
+  Back/Confirm/Cancel buttons on screen with the instructions and item lists as pages between. In landscape both become a column down
+  the right edge so the floor stays visible beside them. Cost: a phone on its side shows few lines per page (the designer's furnish step
+  is 13 pages there); a better answer needs a different furnish control, not more packing.
+- **2026-10-09 — Found and fixed: Details did nothing after "Show me" or an equipment select.** The sheet's remembered selection
+  (`sheetFor`) was only reset in the update path, not in a full redraw, so the next Details press collapsed an already-"open" sheet.
+  It is reset in the redraw too.

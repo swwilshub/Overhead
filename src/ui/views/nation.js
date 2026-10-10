@@ -1,4 +1,5 @@
 import { h, table, kv, announce } from '../dom.js';
+import { pager, pagerState } from '../pager.js';
 import { isCompact } from '../compact.js';
 import { app, go, render as rerender } from '../app.js';
 import * as G from '../../sim/game.js';
@@ -16,6 +17,7 @@ function previewCity(id) {
 }
 const vs = () => (app.viewState.nation ||= { sel: app.st?.cityId ?? 0, sort: { key: 'metro', dir: -1 } });
 
+export const paged = true;
 export function render() {
   const st = app.st; const v = vs();
   const playing = st && st.phase === 'play';
@@ -37,31 +39,40 @@ export function render() {
     g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickIt(); } });
     svg.append(g);
   }
-  wrap.append(h('div', { class: 'grid2 split-nation' },
-    h('div', { class: 'card', style: { padding: '8px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '10px' } }, svg),
-    infoCard(v.sel, playing)));
+  const mapCard = h('div', { class: 'card nation-map', style: { padding: '8px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '10px' } }, svg);
   const rows = CITIES.map(c => ({ ...c, ...cityStats(c.id) }));
-  wrap.append(h('section', { class: 'card' }, h('h2', null, 'Compare cities'),
-    table(`All ${CITIES.length} cities`, [
+  const ps = pagerState('nation');
+  const pick = id => { v.sel = id; ps.group = 'city'; ps.page = 0; rerender({}); document.getElementById('city-info-h')?.focus(); };
+  const list = table(`All ${CITIES.length} cities`, [
       { key: 'name', label: 'City' },
       { key: 'metro', label: 'Metro population', num: true, render: r => num(r.metro) },
       { key: 'avgRent', label: 'Rent / sq ft', num: true, render: r => '$' + r.avgRent.toFixed(2) },
       { key: 'avgSalary', label: 'Avg salary', num: true, render: r => money(r.avgSalary) },
       { key: 'experience', label: 'Experience', num: true, render: r => r.experience + ' mo' },
-      { key: 'go', label: '', sortable: false, render: r => h('button', { type: 'button', 'data-key': 'see-' + r.id, onclick: () => { v.sel = r.id; rerender({}); document.getElementById('city-info-h')?.focus(); } }, 'Details') }],
-    rows, { sortState: v.sort, onSort: so => { v.sort = so; rerender({}); }, scrollable: true, hideCaption: true })));
+      { key: 'go', label: '', sortable: false, render: r => h('button', { type: 'button', 'data-key': 'see-' + r.id, onclick: () => compact ? pick(r.id) : (() => { v.sel = r.id; rerender({}); document.getElementById('city-info-h')?.focus(); })() }, 'Details') }],
+    rows, { sortState: v.sort, onSort: so => { v.sort = so; rerender({}); }, scrollable: !compact, hideCaption: true, noMenu: compact });
+  if (compact) return pager({ title: playing ? 'The nation' : 'Choose a city', name: 'Nation pages', state: ps, groups: [
+    { key: 'map', label: 'Map', blocks: [h('p', { class: 'muted' }, playing ? `Your plant is in ${st.city.name}. Compare it with other markets.` : 'Bigger cities have more customers and a more experienced workforce, but higher rent and wages.'), mapCard, h('div', { class: 'row' }, h('span', null, `Chosen: ${CITIES[v.sel].name}`), h('button', { type: 'button', 'data-key': 'map-details', onclick: () => pick(v.sel) }, 'Details'))] },
+    { key: 'city', label: CITIES[v.sel].name, blocks: infoParts(v.sel, playing) },
+    { key: 'cities', label: 'Compare', header: list.sortMenu, blocks: [list] }] });
+  wrap.append(h('div', { class: 'grid2 split-nation' }, mapCard, infoCard(v.sel, playing)));
+  wrap.append(h('section', { class: 'card' }, h('h2', null, 'Compare cities'), list));
   return wrap;
 }
 
-function infoCard(id, playing) {
+function infoParts(id, playing) {
   const c = CITIES[id], cs = cityStats(id);
   const city = previewCity(id);
   const bm = bestMarkets(city, 5);
   const vacant = city.lots.filter(l => l.firm == null);
-  return h('section', { class: 'card stack', 'aria-labelledby': 'city-info-h' },
+  return [
     h('h2', { id: 'city-info-h', tabindex: -1 }, c.name),
     kv([['Metro population', num(c.metro)], ['City population', num(c.pop)], ['Average rent', `$${cs.avgRent.toFixed(2)} / sq ft / month`], ['Average salary', money(cs.avgSalary)], ['Workforce experience', `${cs.experience} months`], ['Companies in town', num(city.firms.length)], ['Buildings for rent', num(vacant.length)]]),
     h('div', null, h('h3', null, 'Least crowded markets'), h('ul', null, bm.map(i => h('li', null, ITEMS[i].name)))),
     playing ? (app.st.cityId === id ? h('p', { class: 'muted' }, 'Your plant is here.') : h('p', { class: 'muted' }, 'Your plant is already established elsewhere.'))
-      : h('button', { class: 'primary', type: 'button', 'data-key': 'visit', onclick: () => { G.visitCity(app.st, id); announce(`Visiting ${c.name}. Choose a building to lease.`); go('city'); } }, `Visit ${c.name}`));
+      : h('button', { class: 'primary', type: 'button', 'data-key': 'visit', onclick: () => { G.visitCity(app.st, id); announce(`Visiting ${c.name}. Choose a building to lease.`); go('city'); } }, `Visit ${c.name}`)];
+}
+function infoCard(id, playing) {
+  const [head, facts, markets, action] = infoParts(id, playing);
+  return h('section', { class: 'card stack', 'aria-labelledby': 'city-info-h' }, head, facts, markets, action);
 }

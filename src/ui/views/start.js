@@ -1,5 +1,6 @@
 import { h, field, table, announce, confirmBox, stepper } from '../dom.js';
-import { app, go, render as rerender, act } from '../app.js';
+import { app, go, render as rerender, act, isCompact } from '../app.js';
+import { pager, pagerState } from '../pager.js';
 import * as G from '../../sim/game.js';
 import { CITIES, ECONOMY, FAMILIES, ITEM_ID, ITEMS, RECIPES } from '../../gen/data.js';
 import { lineOutlook } from '../../sim/world.js';
@@ -19,7 +20,9 @@ export function mounted() {
   if (scores === undefined) { scores = null; topScores().then(s => { scores = s || []; if (app.view === 'start') rerender({}); }); }
 }
 
+export const paged = true;
 export function render() {
+  if (isCompact()) return startPages();
   const wrap = h('div', { class: 'stack', style: { gap: '28px' } });
   wrap.append(h('div', { class: 'hero-grid' }, h('div', { class: 'hero' },
     h('p', { class: 'kicker' }, 'A 90s-style factory management sim'),
@@ -118,4 +121,28 @@ function quickStart() {
   app.st = st; app.speed = 0;
   sfx('place'); announce(`Quick start: ${st.setup.company} in ${st.city.name}. Press Play to start the clock.`);
   go('floor');
+}
+
+// a phone: the title with its three ways in, then the new-company form, the saved games and the scores, a page each
+function startPages() {
+  const ps = pagerState('start'), toNew = () => { ps.group = 'new'; ps.page = 0; rerender({}); };
+  const hero = [
+    h('p', { class: 'kicker' }, 'A 90s-style factory management sim'), h('h1', { class: 'start-title' }, 'Overhead'), h('div', { class: 'hazard-rule', 'aria-hidden': 'true' }),
+    h('p', null, `Choose one of ${CITIES.length} American cities and lease a plant, then turn raw materials into products and cash.`),
+    h('p', { class: 'muted' }, 'Every screen works with a keyboard and a screen reader, and the clock only moves when you start it.'),
+    h('div', { class: 'row' },
+      saves?.auto ? h('button', { class: 'primary', type: 'button', onclick: () => loadSlot('auto') }, `Continue ${saves.auto.company}`) : null,
+      h('button', { class: saves?.auto ? '' : 'primary', type: 'button', onclick: quickStart }, 'Quick start'),
+      h('button', { type: 'button', 'data-key': 'start-new', onclick: toNew }, 'Set up a new company'))];
+  const form = newGameForm(), save = savesCard();
+  const scoresTable = scores === null ? h('p', { class: 'muted' }, 'Loading scores…') : scores && scores.length ? table('Best companies', [
+      { key: 'company', label: 'Company', render: r => r.company }, { key: 'city', label: 'City' }, { key: 'months', label: 'Months', num: true }, { key: 'score', label: 'Score', num: true, render: r => money(r.score) }],
+    scores, { hideCaption: true, noMenu: true }) : h('p', { class: 'muted' }, 'No scores yet. Retire a company from Options to record yours.');
+  const formEl = form.querySelector('form'); formEl.setAttribute('data-split', '');
+  const saveKids = [...save.children].filter(c => c.tagName !== 'H2');
+  return pager({ title: 'Overhead', name: 'Start pages', state: ps, groups: [
+    { key: 'start', label: 'Start', blocks: hero },
+    { key: 'new', label: 'New company', blocks: [formEl] },
+    { key: 'saves', label: 'Saved games', blocks: saveKids },
+    { key: 'scores', label: 'Best companies', blocks: [scoresTable, h('p', { class: 'muted' }, 'Overhead is free software. Saves stay in this browser unless you export them.')] }] });
 }

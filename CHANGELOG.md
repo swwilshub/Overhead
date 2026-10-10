@@ -4,6 +4,7 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- Everything fits one screen on a phone. Each section is a few pages: large tabs along the top (down the left side when the phone is on its side), **Previous** and **Next** buttons (at the left and right edges on a landscape phone), and a swipe left or right to walk through every page. A long list or table becomes several pages instead of a scroll, so nothing needs scrolling down: Staff (a tab for each department, one person per page), Hiring (a tab for each kind of job), the In-basket, Purchasing, Sales, the Bank, Reports, Research, the Catalog (a tab for each line), the city (map, building, market, ranks), the nation (map, city, compare), Options and the start page. The common questions (a resume and offer, a purchase, the move plan, the equipment list) are paged sheets too. The desktop pages are unchanged.
 - The factory floor is the whole window. The plant fills everything right of the side menu (on a phone, between the top bar
   and the bottom bar), drawn at your screen's own resolution so it is sharp, and nothing scrolls under it. The toolbar,
   Needs attention, the item panel, the zoom buttons and a row of Help, Legend and Equipment list buttons float over the
