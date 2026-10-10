@@ -28,5 +28,5 @@ function boot() {
 // test hook (used by the automated browser tests)
 // hire(role) adds someone for a role (operator, sales, finance, ...) at their asking salary, for tests that need staff
 const hireRole = role => { const st = app.st, c = makeCandidate(st, jobFor(role).key); const m = G.memo(st, { from: 'test', subject: 'r', kind: 'resume', data: { cand: c, expires: st.time + 1e7 } }); m.read = true; const r = G.makeOffer(st, m.id, c.ask * 1.1); return r.ok ? r.emp.id : null; };
-window.__overhead = { app, G, ZONE, sfxLog, belt: floor.beltDebug, RECIPES, ITEMS, FAMILIES, ITEM_ID, FAMILY_ID, drawObject, TILE, cells, suites, jobFor, hire: hireRole };
+window.__overhead = { app, G, ZONE, sfxLog, belt: floor.beltDebug, floorPoint: floor.tileScreen, emptyTile: floor.findEmptyTile, selectId: id => { const o = app.st.floor.objects.find(o => o.id === id); if (o) floor.selectObj(o); }, camera: floor.cameraState, RECIPES, ITEMS, FAMILIES, ITEM_ID, FAMILY_ID, drawObject, TILE, cells, suites, jobFor, hire: hireRole };
 boot();

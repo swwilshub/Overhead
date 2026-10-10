@@ -114,3 +114,28 @@ Newest first. Each entry: date, decision, reason.
 - **2026-10-09 — Purchasing targets are merged at the moment of change.** The old handler spread a copy of the targets
   taken when the page was drawn, so by reading it two rows changed before the next redraw could drop the first edit (I
   did not reproduce this; it was a risk seen while reading the code). The stepper reads the targets when it changes.
+
+- **2026-10-09 — The factory floor is a full-window canvas with a camera.** One canvas fills the content area, sized in device
+  pixels, and pan and zoom are a camera (`camera.js`, tested in Node) rather than a scrolled, CSS-stretched canvas. Reason:
+  Sam asked for the floor to be the whole window with touch done properly; scrolling a frame inside a scrolling page made a
+  drag ambiguous and blurred the picture on dense screens.
+- **2026-10-09 — "All the graphics in that context" means everything drawn, not the controls.** Machines, belts, boxes,
+  workers, zones, selection, cursor, ghost, gauges and the cell designer's overlays are drawn into the one canvas context.
+  Text and buttons stay real page elements floating over it. Reason: drawing them into the canvas would hide them from
+  assistive technology and from the keyboard; pillar 4 outranks a single draw surface. (If Sam meant the controls too,
+  that is a different, much larger decision.)
+- **2026-10-09 — Touch, pen and mouse share one pointer path.** Pointer capture on the surface, `touch-action: none`, a Map
+  of active pointers, pinch with the midpoint following the fingers, a cancelled touch ends cleanly, and a lifted finger
+  never turns into a drag or a tap. A flick glides for touch and pen, not for the mouse. Reason: the old code had separate
+  mouse and touch paths and relied on the frame's scrolling.
+- **2026-10-09 — The mouse pans by dragging empty floor in Select, by the middle button anywhere, and the wheel zooms.** A click
+  still selects, and Paint, Lay conveyor and placing keep the left button. Reason: the frame's scrollbars are gone; these
+  are the usual map controls. Shift and the wheel pan; Ctrl and the wheel (a trackpad pinch) zoom.
+- **2026-10-09 — The equipment table moved into the Equipment list panel.** It is no longer under the floor, because the page
+  does not scroll. It stays a real table, reachable by keyboard and screen reader. Help and Legend moved to panels too.
+- **2026-10-09 — The first view fits the plant between the floating controls.** It is never bigger than 2×, a desktop never
+  starts below 1×, and a phone may start as small as ½×; a landscape phone puts the tools in a column at the left. Reason:
+  the old phone default clipped the right-hand side of the plant.
+- **2026-10-09 — Off-screen text no longer makes the page taller.** The two live regions were absolutely positioned at the
+  bottom and pushed the document one pixel past the window on every page. They are fixed now, so the floor page cannot
+  scroll at all. Found by the new floor test.

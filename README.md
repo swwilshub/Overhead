@@ -22,8 +22,9 @@ repository, the latest build is also published there.
   builds the same cities).
 
 On a phone or tablet the game uses a slim top bar, a bottom bar (Floor, Staff, In-basket, Menu) and bottom sheets for
-questions and for the machine you tap. On the factory floor, drag to look around, pinch to zoom, tap to select, and
-press **Place here** to put something down. Tables become cards, and nothing scrolls sideways.
+questions and for the machine you tap. The factory floor fills the whole window, with the controls floating over it. Drag to look around (a flick keeps
+going), pinch to zoom, tap to select, and press **Place here** to put something down. With a mouse, drag empty floor to
+look around and use the wheel to zoom. Tables become cards, and nothing scrolls sideways.
 
 ### How it plays
 

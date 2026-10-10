@@ -25,7 +25,7 @@ async def main():
           return { A: A.id, B: B.id }; }""")
         await pg.click('nav.rail a[href="#city"]'); await pg.click('nav.rail a[href="#floor"]'); await pg.wait_for_timeout(400)
         # select A from the equipment table, then connect by belt via the inspector
-        await pg.click(f'[data-key="eq-{ids["A"]}"]'); await pg.wait_for_timeout(300)
+        await pg.evaluate(f"() => window.__overhead.selectId({ids['A']})"); await pg.wait_for_timeout(300)
         ok(await pg.locator('h3:has-text("Inputs, output and belts")').count() == 1, 'machine inspector has an Inputs, output and belts section')
         opt = await pg.locator('#belt-to option').first.text_content()
         ok('uses' in opt, 'first belt target is the machine that uses our output: ' + opt)
@@ -66,7 +66,7 @@ async def main():
         cv = await pg.evaluate("() => { const fl = window.__overhead.app.st.floor; const c = fl.objects.filter(o => o.kind === 'conveyor')[2]; return c.id; }")
         await pg.evaluate("(id) => { const {app} = window.__overhead; app.viewState.floor.sel = id; app.speed = 0; }", cv)
         await pg.focus('#floor-app'); await pg.keyboard.press('Escape'); await pg.evaluate("(id) => { window.__overhead.app.viewState.floor.sel = id; }", cv)
-        await pg.click(f'[data-key="eq-{ids["A"]}"]'); await pg.wait_for_timeout(200)
+        await pg.evaluate(f"() => window.__overhead.selectId({ids['A']})"); await pg.wait_for_timeout(200)
         await pg.evaluate("(id) => { window.__overhead.app.viewState.floor.sel = id; window.__overhead.app.dirty = true; }", cv)
         await pg.evaluate("() => { document.querySelector('#floor-app').dispatchEvent(new Event('focus')); }")
         # a raw conveyor with nothing attached is explained
@@ -83,7 +83,7 @@ async def main():
         ok(t1 == t2 and '"' in t1, f'paused: boxes stay where they are on the belt {t1[:80]}')
         await pg.evaluate("() => { window.__overhead.app.speed = 0; }")
         await pg.emulate_media(reduced_motion='no-preference')
-        await pg.click(f'[data-key="eq-{ids["A"]}"]'); await pg.wait_for_timeout(300)
+        await pg.evaluate(f"() => window.__overhead.selectId({ids['A']})"); await pg.wait_for_timeout(300)
         await pg.add_script_tag(content=AXE)
         res = await pg.evaluate("async () => { const r = await axe.run(document, { resultTypes: ['violations'] }); return r.violations.map(v => v.id + ':' + v.nodes.length); }")
         ok(not res, f'axe on floor with belt inspector: {res}')

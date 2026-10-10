@@ -4,6 +4,13 @@ Player-facing changes, newest first.
 
 ## Unreleased
 
+- The factory floor is the whole window. The plant fills everything right of the side menu (on a phone, between the top bar
+  and the bottom bar), drawn at your screen's own resolution so it is sharp, and nothing scrolls under it. The toolbar,
+  Needs attention, the item panel, the zoom buttons and a row of Help, Legend and Equipment list buttons float over the
+  edges; the equipment table now opens from Equipment list. Touch is one path for finger, pen and mouse: drag to look
+  around (a flick keeps going and slows down), pinch to zoom about your fingers, tap to select; the page never scrolls or
+  pulls to refresh underneath. With a mouse, drag empty floor or hold the middle button to pan, use the wheel to zoom, and
+  press + and − to zoom and 0 to fit. A phone fits the whole plant to start with.
 - No more typing numbers. Every number you set is now a control you tap: big plus and minus buttons (hold to repeat,
   faster the longer you hold), preset chips and a slider where one helps. A salary offer has a slider from 70% to 130% of
   the ask, buttons for $500 and $2,000, chips for Ask −10%, −5%, the ask and +5%, and a line saying how your offer

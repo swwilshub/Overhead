@@ -95,14 +95,15 @@ async def main():
         await pg.click('nav.rail a[href="#floor"]'); await pg.wait_for_timeout(300)
         cl = await pg.locator('#inspector').inner_text()
         ok('Hire a Junior Operator' in cl and 'Hire a Junior Sales Rep and give them a desk' in cl, 'checklist uses the job titles: ' + ' '.join(cl.split())[:200])
-        eq = await pg.locator('table:has(th:has-text("Status / occupant"))').inner_text()
+        await pg.click('[data-key="hud-equipment"]'); await pg.wait_for_timeout(250)
+        eq = await pg.locator('dialog[open] table:has(th:has-text("Status / occupant"))').inner_text()
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
         ok(re.search(r'machine #\d+', eq) and 'Machine #' not in eq, 'equipment table uses one machine label: ' + ' '.join(eq.split())[:120])
         await old_names_gone(pg, 'Factory floor')
         # select a machine, then an empty square: the checklist and Cursor card come back, not "[object HTMLElement]"
         await pg.click('nav.rail a[href="#floor"]'); await pg.wait_for_timeout(300)
-        box = await pg.locator('#floor-app canvas').bounding_box()
         async def click_tile(tx, ty):
-            await pg.mouse.click(box['x'] + (6 + tx * 16 + 8) * 2, box['y'] + (28 + ty * 16 + 8) * 2); await pg.wait_for_timeout(200)
+            x, y = await pg.evaluate("([x, y]) => window.__overhead.floorPoint(x, y)", [tx, ty]); await pg.mouse.click(x, y); await pg.wait_for_timeout(200)
         sel = lambda: pg.evaluate("() => window.__overhead.app.viewState.floor.sel")
         mc = await pg.evaluate("() => { const o = window.__overhead.app.st.floor.objects.find(o => o.kind === 'machine'); return [o.id, Math.round(o.x), Math.round(o.y)]; }")
         await click_tile(mc[1], mc[2])
@@ -113,9 +114,8 @@ async def main():
         ok('Operator' in panel and 'Line Worker' not in panel and 'Hire an operator' not in panel, 'machine panel names the Operator')
         await old_names_gone(pg, 'machine panel'); await axe_check(pg, 'machine panel with new names')
         fw, fh = await pg.evaluate("() => { const f = window.__overhead.app.st.floor; return [f.w, f.h]; }")
-        for (tx, ty) in [(fw // 2, fh - 3), (fw - 3, fh - 3), (3, fh - 3), (fw // 2, fh // 2), (fw - 3, 3)]:
-            await click_tile(tx, ty)
-            if await sel() is None: break
+        et = await pg.evaluate("() => window.__overhead.emptyTile()")
+        await click_tile(*et)
         insp = await pg.locator('#inspector').text_content()
         ok(await sel() is None and 'Getting started' in insp and 'Cursor' in insp and '[object' not in insp, 'empty square shows the checklist and Cursor card: ' + ' '.join(insp.split())[:120])
         ok(await pg.evaluate("() => document.activeElement?.id") == 'floor-app', 'focus stays on the floor grid')
